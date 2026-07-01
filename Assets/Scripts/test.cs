@@ -166,105 +166,125 @@ public class test : MonoBehaviour
 
         //<入力チェック>
         //右移動(前)
-        if //(Keyboard.current.dKey.wasPressedThisFrame && Controlflag)
-        (Gamepad.current.leftStick.value.x >= 0.03 && Controlflag)
+        if(Gamepad.current != null)
         {
-            //操作用変数に代入
-            Control_I = 1;
-            //操作可能フラグをOFF
-            //Controlflag = false;
-        }
-        //左移動(後ろ)
-        if //(Keyboard.current.aKey.wasPressedThisFrame && Controlflag)
-        (Gamepad.current.leftStick.value.x <= -0.03 && Controlflag)
-        {
-            //操作用変数に代入
-            Control_I = 2;
-            //操作可能フラグをOFF
-            //Controlflag = false;
-
-        }
-        //ジャンプ
-        if //(Keyboard.current.wKey.wasPressedThisFrame && Controlflag && Jumpflag)
-        (Gamepad.current.xButton.wasPressedThisFrame && (Jumpflag && Controlflag))
-        {
-            //操作用変数に代入
-            Control_I = 3;
-            //操作可能フラグをOFF
-            Controlflag = false;
-        }
-        //しゃがみ
-        if (Gamepad.current.leftStick.value.y <= -0.43 && Controlflag)
-        //(Keyboard.current.sKey.wasPressedThisFrame && Controlflag && Jumpflag)
-        {
-            //操作用変数に代入
-            Control_I = 10;
-        }
-        else if (Gamepad.current.leftStick.value.y >= 0.0 && Controlflag)
-        {
-            Control_I = 0;
-            animator.SetBool("Crouch", false);
-
-            //当たり判定を上げる
-            Player_Collider.height = 2.0f;
-            Player_Collider.center = new Vector3(0, 1.0f, 0);
-
-        }
-
-        //パンチ
-        if //(Keyboard.current.qKey.wasPressedThisFrame && Controlflag)
-        ((Gamepad.current.bButton.wasPressedThisFrame ) && Controlflag)
-        {
-            //操作用変数に代入
-            Control_I = 4;
-            //操作可能フラグをOFF
-            Controlflag = false;
-
-        }
-        //キック
-        if  //(Keyboard.current.zKey.wasPressedThisFrame && Controlflag)
-           (Gamepad.current.aButton.wasPressedThisFrame && Controlflag)
-        {
-            if//(Keyboard.current.wKey.wasPressedThisFrame)
-                (Gamepad.current.leftStick.value.y < -0.43f)
+            if //(Keyboard.current.dKey.wasPressedThisFrame && Controlflag)
+            (Gamepad.current.leftStick.value.x >= 0.03 && Controlflag)
             {
-                Control_I = 8;
+                //操作用変数に代入
+                Control_I = 1;
+                //操作可能フラグをOFF
+                //Controlflag = false;
             }
-            else if//(Keyboard.current.sKey.wasPressedThisFrame)
-                (Gamepad.current.leftStick.value.y > 0.25f)
+            //左移動(後ろ)
+            if //(Keyboard.current.aKey.wasPressedThisFrame && Controlflag)
+            (Gamepad.current.leftStick.value.x <= -0.03 && Controlflag)
             {
-                Control_I = 9;
+                //操作用変数に代入
+                Control_I = 2;
+                //操作可能フラグをOFF
+                //Controlflag = false;
+
+            }
+            //ジャンプ
+            if //(Keyboard.current.wKey.wasPressedThisFrame && Controlflag && Jumpflag)
+            (Gamepad.current.xButton.wasPressedThisFrame && (Jumpflag && Controlflag))
+            {
+                //操作用変数に代入
+                Control_I = 3;
+                //操作可能フラグをOFF
+                Controlflag = false;
+            }
+            //しゃがみ
+            /*if (Gamepad.current.leftStick.value.y <= -0.43 && Controlflag)
+            //(Keyboard.current.sKey.wasPressedThisFrame && Controlflag && Jumpflag)
+            {
+                //操作用変数に代入
+                Control_I = 10;
+            }
+            else if (Gamepad.current.leftStick.value.y >= 0.0 && Controlflag)
+            {
+                Control_I = 0;
+                animator.SetBool("Crouch", false);
+
+                //当たり判定を上げる
+                Player_Collider.height = 2.0f;
+                Player_Collider.center = new Vector3(0, 1.0f, 0);
+
+            }
+            */
+            bool isCrouching = Gamepad.current.leftStick.value.y <= -0.43f;
+
+            if (isCrouching && Controlflag)
+            {
+                Control_I = 10;
             }
             else
             {
-                //操作用変数に代入
-                Control_I = 5;
+                // しゃがみ解除の見た目処理だけ行い、Control_Iは触らない
+                if (animator.GetBool("Crouch"))
+                {
+                    animator.SetBool("Crouch", false);
+                    Player_Collider.height = 2.0f;
+                    Player_Collider.center = new Vector3(0, 1.0f, 0);
+                }
             }
-                
-            //操作可能フラグをOFF
-            Controlflag = false;
-        }
-        //仁王立ち
-        if //(Keyboard.current.eKey.wasPressedThisFrame && Controlflag)
-        (Gamepad.current.yButton.wasPressedThisFrame && Controlflag)
-        {
-            //操作用変数に代入
-            Control_I = 6;
-            Controlflag = false;
-        }
-        //投げ
-        if//(Keyboard.current.xKey.wasPressedThisFrame && Controlflag)
-        (Gamepad.current.rightShoulder.wasPressedThisFrame && Controlflag)
-        {
-            //操作用変数に代入
-            Control_I = 7;
-            Controlflag = false;
-        }
-        
+
+            //パンチ
+            if //(Keyboard.current.qKey.wasPressedThisFrame && Controlflag)
+            ((Gamepad.current.bButton.wasPressedThisFrame) && Controlflag)
+            {
+                //操作用変数に代入
+                Control_I = 4;
+                //操作可能フラグをOFF
+                Controlflag = false;
+
+            }
+            //キック
+            if  //(Keyboard.current.zKey.wasPressedThisFrame && Controlflag)
+               (Gamepad.current.aButton.wasPressedThisFrame && Controlflag)
+            {
+                if//(Keyboard.current.wKey.wasPressedThisFrame)
+                    (Gamepad.current.leftStick.value.y < -0.43f)
+                {
+                    Control_I = 8;
+                }
+                else if//(Keyboard.current.sKey.wasPressedThisFrame)
+                    (Gamepad.current.leftStick.value.y > 0.25f)
+                {
+                    Control_I = 9;
+                }
+                else
+                {
+                    //操作用変数に代入
+                    Control_I = 5;
+                }
+
+                //操作可能フラグをOFF
+                Controlflag = false;
+            }
+            //仁王立ち
+            if //(Keyboard.current.eKey.wasPressedThisFrame && Controlflag)
+            (Gamepad.current.yButton.wasPressedThisFrame && Controlflag)
+            {
+                //操作用変数に代入
+                Control_I = 6;
+                Controlflag = false;
+            }
+            //投げ
+            if//(Keyboard.current.xKey.wasPressedThisFrame && Controlflag)
+            (Gamepad.current.rightShoulder.wasPressedThisFrame && Controlflag)
+            {
+                //操作用変数に代入
+                Control_I = 7;
+                Controlflag = false;
+            }
 
 
 
-            switch (Control_I)
+        }
+
+        switch (Control_I)
         {
             case 0:
                 //待機
@@ -327,6 +347,7 @@ public class test : MonoBehaviour
                 Crouch();
                 break;
         }
+
     }
 
     void OnCollisionEnter(Collision other)
@@ -607,4 +628,6 @@ public class test : MonoBehaviour
         GameMNG mng = GameObject.Find("ManagerObject").GetComponent<GameMNG>();
         mng.Enemy_ReduceHP(HP);
     }
+
+
 }
