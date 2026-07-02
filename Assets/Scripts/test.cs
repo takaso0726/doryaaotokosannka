@@ -1,4 +1,4 @@
-using System.Security.Cryptography.X509Certificates;
+﻿using System.Security.Cryptography.X509Certificates;
 using Unity.VisualScripting;
 using UnityEditor;
 using UnityEngine;
@@ -190,6 +190,8 @@ public class test : MonoBehaviour
             if //(Keyboard.current.wKey.wasPressedThisFrame && Controlflag && Jumpflag)
             (Gamepad.current.xButton.wasPressedThisFrame && (Jumpflag && Controlflag))
             {
+                //デバックログの表示
+                Debug.Log("ジャンプ");
                 //操作用変数に代入
                 Control_I = 3;
                 //操作可能フラグをOFF
@@ -234,6 +236,14 @@ public class test : MonoBehaviour
             if //(Keyboard.current.qKey.wasPressedThisFrame && Controlflag)
             ((Gamepad.current.bButton.wasPressedThisFrame) && Controlflag)
             {
+                //デバックログの表示
+                Debug.Log("パンチ");
+
+                // 予約をすべてクリア
+                animator.ResetTrigger("Punch");
+                animator.ResetTrigger("Flying-kick");
+                animator.ResetTrigger("Kick");
+                animator.ResetTrigger("Jump");
                 //操作用変数に代入
                 Control_I = 4;
                 //操作可能フラグをOFF
@@ -244,18 +254,32 @@ public class test : MonoBehaviour
             if  //(Keyboard.current.zKey.wasPressedThisFrame && Controlflag)
                (Gamepad.current.aButton.wasPressedThisFrame && Controlflag)
             {
+                // 予約をすべてクリア
+                animator.ResetTrigger("Punch");
+                animator.ResetTrigger("Flying-kick");
+                animator.ResetTrigger("Kick");
+                animator.ResetTrigger("Jump");
+
                 if//(Keyboard.current.wKey.wasPressedThisFrame)
                     (Gamepad.current.leftStick.value.y < -0.43f)
                 {
+                    //デバックログの表示
+                    Debug.Log("下キック");
                     Control_I = 8;
                 }
                 else if//(Keyboard.current.sKey.wasPressedThisFrame)
                     (Gamepad.current.leftStick.value.y > 0.25f)
                 {
+                    //デバックログの表示
+                    Debug.Log("上キック");
+
                     Control_I = 9;
                 }
                 else
                 {
+                    //デバックログの表示
+                    Debug.Log("キック");
+
                     //操作用変数に代入
                     Control_I = 5;
                 }
@@ -267,6 +291,8 @@ public class test : MonoBehaviour
             if //(Keyboard.current.eKey.wasPressedThisFrame && Controlflag)
             (Gamepad.current.yButton.wasPressedThisFrame && Controlflag)
             {
+                //デバックログの表示
+                Debug.Log("仁王立ち");
                 //操作用変数に代入
                 Control_I = 6;
                 Controlflag = false;
@@ -275,13 +301,13 @@ public class test : MonoBehaviour
             if//(Keyboard.current.xKey.wasPressedThisFrame && Controlflag)
             (Gamepad.current.rightShoulder.wasPressedThisFrame && Controlflag)
             {
+                //デバックログの表示
+                Debug.Log("掴み");
+
                 //操作用変数に代入
                 Control_I = 7;
                 Controlflag = false;
             }
-
-
-
         }
 
         switch (Control_I)
@@ -352,7 +378,6 @@ public class test : MonoBehaviour
 
     void OnCollisionEnter(Collision other)
     {
-
         if (other.gameObject.CompareTag("Ground"))
         {
             //ジャンプフラグをあげる
@@ -367,8 +392,6 @@ public class test : MonoBehaviour
         {
             //体力を表示
             Debug.Log("プレイヤーのHP : " + HP);
-
-
 
             if (Menflag)
             {
@@ -455,7 +478,7 @@ public class test : MonoBehaviour
     void Movefront()//前移動
     {
         //プレイヤーを前(右)に移動させる
-        transform.Translate(0.0f, 0.0f, moveSpeed);
+        transform.Translate(0.0f, 0.0f, moveSpeed * Time.deltaTime);
         //操作用変数をリセット
         Control_I = 0;
     }
@@ -463,7 +486,7 @@ public class test : MonoBehaviour
     void Moveback()//後ろ移動
     {
         //プレイヤーを後ろ(左)に移動させる
-        transform.Translate(0.0f, 0.0f, -moveSpeed);
+        transform.Translate(0.0f, 0.0f, -moveSpeed * Time.deltaTime);
         //操作用変数をリセット
         Control_I = 0;
     }
@@ -484,6 +507,11 @@ public class test : MonoBehaviour
     {
         Controlflag = false;
         Control_I = 0;
+
+        // 連打防止のためリセット
+        animator.ResetTrigger("Punch");
+        animator.ResetTrigger("Flying-kick");
+
         //タイマーをリセット
         AttackTimer = -0.5f;
         if(Jumpflag)
@@ -550,8 +578,6 @@ public class test : MonoBehaviour
         AttackTimer = -1.5f;
         //操作用変数をリセット
         Control_I = 0;
-
-
 
         //投げれるか距離でチェック(距離と相手の状態で判断したい)
         if (enemy.Enemy_Status != Enemy.Status.Attack && (enemy.transform.position.z - transform.position.z < 1.75f) && flag)
