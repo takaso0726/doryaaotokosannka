@@ -478,7 +478,7 @@ public class test : MonoBehaviour
     void Movefront()//前移動
     {
         //プレイヤーを前(右)に移動させる
-        transform.Translate(0.0f, 0.0f, moveSpeed * Time.deltaTime);
+        transform.Translate(0.0f, 0.0f, moveSpeed);
         //操作用変数をリセット
         Control_I = 0;
     }
@@ -486,7 +486,7 @@ public class test : MonoBehaviour
     void Moveback()//後ろ移動
     {
         //プレイヤーを後ろ(左)に移動させる
-        transform.Translate(0.0f, 0.0f, -moveSpeed * Time.deltaTime);
+        transform.Translate(0.0f, 0.0f, -moveSpeed);
         //操作用変数をリセット
         Control_I = 0;
     }
