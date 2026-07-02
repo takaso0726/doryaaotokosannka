@@ -508,7 +508,7 @@ public class test : MonoBehaviour
         Controlflag = false;
         Control_I = 0;
 
-        // 連打防止のためリセット
+        // 連打防止のためトリガーをリセット
         animator.ResetTrigger("Punch");
         animator.ResetTrigger("Flying-kick");
 
@@ -536,6 +536,9 @@ public class test : MonoBehaviour
     {
         //コントロールフラグをOFF
         Controlflag = false;
+        //トリガーをリセット
+        animator.ResetTrigger("Kick");
+
         //強攻撃(キック)
         animator.SetTrigger("Kick");
         //タイマーをリセット
@@ -572,10 +575,16 @@ public class test : MonoBehaviour
     void Throwing()
     {
         Controlflag = false;
-        //投げ
-        //アニメーション再生
+        //トリガーをリセット
+        animator.ResetTrigger("Throw-start");
+
+        //投げアニメーション再生
         animator.SetTrigger("Throw-start");
         AttackTimer = -1.5f;
+
+        // 掴む時の距離
+        float distanceZ = Mathf.Abs(enemy.transform.position.z - transform.position.z);
+
         //操作用変数をリセット
         Control_I = 0;
 
@@ -593,6 +602,11 @@ public class test : MonoBehaviour
     //下キック
     void DonwnKick()
     {
+        //上書き防止のため固定
+        Controlflag = false;
+        //トリガーをリセット
+        animator.ResetTrigger("DownKick");
+
         animator.SetTrigger("DownKick");
         AttackTimer = -0.5f;
         Control_I = 0;
@@ -604,6 +618,11 @@ public class test : MonoBehaviour
     //上キック
     void UpKick()
     {
+        //上書き防止のため固定
+        Controlflag = false;
+        //トリガーをリセット
+        animator.ResetTrigger("UpKick");
+
         animator.SetTrigger("UpKick");
         AttackTimer = -0.7f;
         Control_I = 0;
