@@ -40,12 +40,23 @@ public class FightingCameraController : MonoBehaviour
     [Tooltip("注視点の回転スムーズさ")]
     public float rotationSmoothTime = 0.2f;
 
+    [Header("勝利演出（フォーカス）設定")]
+    [Tooltip("勝利したキャラクターにズームする際のカメラ距離")]
+    public float focusZoomDistance = 4f;
+
+    [Tooltip("フォーカス演出時、対象を見る高さオフセット")]
+    public float focusLookAtHeightOffset = 1.2f;
+
     // 内部状態
     private Vector3 _velocityPos;   // SmoothDamp用
     private float _velocityZoom;    // SmoothDamp用（float）
     private float _currentDistance; // 現在のカメラ距離
     private Vector3 _currentLookAtVelocity;
     private Vector3 _smoothedLookAt;
+
+    // フォーカス（勝者ズーム）関連
+    private bool _isFocusMode = false;
+    private Transform _focusTarget;
 
     void Start()
     {
@@ -55,6 +66,14 @@ public class FightingCameraController : MonoBehaviour
 
     void LateUpdate()
     {
+
+        // 勝敗が決まり、勝者へのフォーカス演出中の場合は専用の処理を行う
+        if (_isFocusMode)
+        {
+            UpdateFocusCamera();
+            return;
+        }
+
         // 出場キャラクターがいない場合は何もしない
         CleanupNullTargets();
         if (targets.Count == 0) return;
@@ -143,6 +162,70 @@ public class FightingCameraController : MonoBehaviour
     private void CleanupNullTargets()
     {
         targets.RemoveAll(t => t == null);
+    }
+
+    /// <summary>
+    /// フォーカスモード中のカメラ更新処理
+    /// 指定した勝者キャラクターにズームして注視する
+    /// </summary>
+    private void UpdateFocusCamera()
+    {
+        // フォーカス対象が消えていたら何もしない
+        if (_focusTarget == null) return;
+
+        // 注視点（勝者の少し上）をスムーズに更新
+        Vector3 lookAtTarget = _focusTarget.position + Vector3.up * focusLookAtHeightOffset;
+        _smoothedLookAt = Vector3.SmoothDamp(
+            _smoothedLookAt,
+            lookAtTarget,
+            ref _currentLookAtVelocity,
+            rotationSmoothTime
+        );
+
+        // カメラ距離をフォーカス用の距離までスムーズに詰める
+        _currentDistance = Mathf.SmoothDamp(
+            _currentDistance,
+            focusZoomDistance,
+            ref _velocityZoom,
+            zoomSmoothTime
+        );
+
+        // オフセット方向を距離に応じてスケーリングしてカメラ目標位置を算出
+        Vector3 offsetDirection = baseOffset.normalized;
+        Vector3 desiredCameraPos = _smoothedLookAt + offsetDirection * _currentDistance;
+
+        // カメラ位置をスムーズに移動
+        transform.position = Vector3.SmoothDamp(
+            transform.position,
+            desiredCameraPos,
+            ref _velocityPos,
+            followSmoothTime
+        );
+
+        // 常に勝者を見るように回転
+        transform.LookAt(_smoothedLookAt);
+    }
+
+    /// <summary>
+    /// 勝敗決定時に呼び出す。指定したキャラクターにカメラをズームさせる
+    /// （GameMNG等、勝敗を管理するスクリプトから呼び出す想定）
+    /// </summary>
+    public void FocusOnTarget(Transform target)
+    {
+        if (target == null) return;
+
+        _isFocusMode = true;
+        _focusTarget = target;
+    }
+
+    /// <summary>
+    /// フォーカス演出を終了し、通常の追従モードへ戻す
+    /// （リマッチやシーン遷移前のリセット等で使用）
+    /// </summary>
+    public void ClearFocus()
+    {
+        _isFocusMode = false;
+        _focusTarget = null;
     }
 
     /// <summary>

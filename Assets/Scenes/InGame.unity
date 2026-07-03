@@ -924,6 +924,8 @@ MonoBehaviour:
   zoomSmoothTime: 0.3
   lookAtHeightOffset: 1
   rotationSmoothTime: 0.2
+  focusZoomDistance: 2
+  focusLookAtHeightOffset: 1.2
 --- !u!1 &343912591
 GameObject:
   m_ObjectHideFlags: 0
@@ -1557,6 +1559,9 @@ MonoBehaviour:
   P_HPbar: {fileID: 1289788541}
   E_HPbar: {fileID: 939642776}
   gameOverTime: 2
+  PlayerTransform: {fileID: 956537544}
+  EnemyTransform: {fileID: 1593231836}
+  cameraController: {fileID: 330585548}
 --- !u!4 &750834239
 Transform:
   m_ObjectHideFlags: 0

@@ -26,7 +26,14 @@ public class GameMNG : MonoBehaviour
     //プレイヤーの状態
     test.Status playerStatus;
 
-    
+    [Header("勝敗カメラ演出")]
+    //プレイヤーのTransform（勝利時にカメラがズームする対象）
+    public Transform PlayerTransform;
+    //敵のTransform（プレイヤー敗北＝敵勝利時にカメラがズームする対象）
+    public Transform EnemyTransform;
+    //シーン中のカメラコントローラー
+    public FightingCameraController cameraController;
+
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
@@ -114,6 +121,21 @@ public class GameMNG : MonoBehaviour
     public void SettestStatus(test.Status ps)
     {
         playerStatus = ps;
+
+        //勝敗が決まったら、勝った方にカメラをズームする
+        if (cameraController != null)
+        {
+            if (playerStatus == test.Status.Win)
+            {
+                //プレイヤーが勝利
+                cameraController.FocusOnTarget(PlayerTransform);
+            }
+            else if (playerStatus == test.Status.Dead)
+            {
+                //プレイヤーが敗北＝敵の勝利
+                cameraController.FocusOnTarget(EnemyTransform);
+            }
+        }
     }
 }
 
