@@ -25,8 +25,6 @@ public class test : MonoBehaviour
 
     int Control_I;                  //操作の入力から分岐するための変数
 
-    bool isDeadflag = false;            // HPが0になった際の変数
-
     //効果音用
     AudioSource se;
     public AudioClip MenBlock_se;
@@ -58,6 +56,9 @@ public class test : MonoBehaviour
 
     bool flag;
     
+
+
+
     //当たり判定の子オブジェクト
     CapsuleCollider Head;
     CapsuleCollider RightArm;
@@ -81,8 +82,6 @@ public class test : MonoBehaviour
         Jumpflag = true;
         Controlflag = true;
         Menflag = false;
-        isDeadflag = false;
-
         AttackTimer = 0.0f;
         HP = 100;
         atk = 10;
@@ -90,7 +89,10 @@ public class test : MonoBehaviour
         Control_I = 0;
         AttackCnt = 0;
 
+       
+
         rb = GetComponent<Rigidbody>();		//PlayerのRigidbodyを取得
+
         animator = GetComponent<Animator>();
 
         //<当たり判定の子オブジェクトの取得>
@@ -158,12 +160,6 @@ public class test : MonoBehaviour
         }
         else//HPが0か
         {
-            if (!isDeadflag)
-            {
-                Debug.Log("やられた!!");
-                isDeadflag = true; // ログは一回だけ表示する
-            }
-
             //復活チャレンジに移行
             RebornCh(RebornCnt);
         }
@@ -391,20 +387,11 @@ public class test : MonoBehaviour
 
     private void OnTriggerEnter(Collider collision)
     {
-        // 敵に攻撃が当たった時の判定
-        if (collision.gameObject.CompareTag("Enemy"))
-        {
-            // デバックログ
-            Debug.Log("攻撃が当たった");
-        }
-
         //当たった対象物の[tag]がEAttack (エネミーによる攻撃)だった場合は処理する
         if (collision.gameObject.CompareTag("EAttack") && HP > 0)
         {
             //体力を表示
             Debug.Log("プレイヤーのHP : " + HP);
-            //被弾判定
-            Debug.Log("敵の攻撃が当たった");
 
             if (Menflag)
             {

@@ -914,8 +914,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CameraController
   targets:
-  - {fileID: 0}
-  - {fileID: 0}
+  - {fileID: 956537544}
+  - {fileID: 1593231836}
   followSmoothTime: 0.25
   baseOffset: {x: 10, y: 3, z: 0}
   minZoomDistance: 6
@@ -2242,7 +2242,6 @@ MonoBehaviour:
   Hit_particle: {fileID: 3132062550767402246, guid: a48a9f201806121499896f3e561bf1c4, type: 3}
   enemy: {fileID: 1593231832}
   animator: {fileID: 0}
-  cameraController: {fileID: 0}
 --- !u!54 &956537539
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -2412,6 +2411,11 @@ AudioSource:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
+--- !u!4 &956537544 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 29dd0fc02d04a7447b40e484821a9f0d, type: 3}
+  m_PrefabInstance: {fileID: 1762534572}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &965242689
 GameObject:
   m_ObjectHideFlags: 0
@@ -3389,7 +3393,6 @@ MonoBehaviour:
   Hit_particle: {fileID: 3132062550767402246, guid: a48a9f201806121499896f3e561bf1c4, type: 3}
   enemy: {fileID: 0}
   animator: {fileID: 0}
-  cameraController: {fileID: 0}
 --- !u!4 &1202966597 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 3ee547485a232eb408aeca940bb7724b, type: 3}
@@ -4137,7 +4140,6 @@ MonoBehaviour:
   Hit_particle: {fileID: 3132062550767402246, guid: a48a9f201806121499896f3e561bf1c4, type: 3}
   enemy: {fileID: 0}
   animator: {fileID: 0}
-  cameraController: {fileID: 0}
 --- !u!1 &1491263583
 GameObject:
   m_ObjectHideFlags: 0
@@ -4487,8 +4489,14 @@ MonoBehaviour:
   Men_particle: {fileID: 8049100662646873597, guid: eb3bdfa2eb6b25c4693f8900c7cf4ed7, type: 3}
   Hit_particle: {fileID: 3132062550767402246, guid: a48a9f201806121499896f3e561bf1c4, type: 3}
   cameraController: {fileID: 0}
-  nearRange: 1.8
-  midRange: 3.5
+  nearRange: 2
+  midRange: 5
+  difficulty: 2
+  useDifficultyPreset: 1
+  reactionInterval: 1
+  mistakeChance: 1
+  defenseAwareness: 0.7
+  damageMultiplier: 1
 --- !u!95 &1593231833
 Animator:
   serializedVersion: 7
@@ -4561,6 +4569,11 @@ Rigidbody:
   m_Interpolate: 0
   m_Constraints: 114
   m_CollisionDetection: 0
+--- !u!4 &1593231836 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 29dd0fc02d04a7447b40e484821a9f0d, type: 3}
+  m_PrefabInstance: {fileID: 1190802857}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &1624732713
 GameObject:
   m_ObjectHideFlags: 0

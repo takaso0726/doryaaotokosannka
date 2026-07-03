@@ -56,11 +56,68 @@ public class Enemy : MonoBehaviour
     public float nearRange = 1.8f;
     public float midRange = 3.5f;
 
+    // ---- CPU 難易度 ----
+    public enum Difficulty
+    {
+        Easy,
+        Normal,
+        Hard
+    }
+
+    [Header("CPU難易度設定")]
+    public Difficulty difficulty = Difficulty.Normal;
+
+    [Tooltip("ONの場合、Difficultyの選択に応じて下記パラメータを自動設定する。手動で細かく調整したい場合はOFFにする")]
+    public bool useDifficultyPreset = true;
+
+    [Tooltip("行動を判断する間隔(秒)。小さいほど反応が速い")]
+    public float reactionInterval = 1.0f;
+
+    [Tooltip("判断を誤ってランダムな行動を取ってしまう確率(0〜1)。低難易度ほど高い")]
+    [Range(0f, 1f)] public float mistakeChance = 0.1f;
+
+    [Tooltip("プレイヤーの攻撃に気づいて防御的な行動を選べる確率(0〜1)。低難易度ほど見逃しやすい")]
+    [Range(0f, 1f)] public float defenseAwareness = 0.7f;
+
+    [Tooltip("投げ攻撃などCPU側の与ダメージにかかる倍率")]
+    public float damageMultiplier = 1.0f;
+
     void Awake()
     {
         // シーン内のカメラコントローラーを自動取得したい場合
         if (cameraController == null)
             cameraController = FindAnyObjectByType<FightingCameraController>();
+
+        if (useDifficultyPreset)
+            ApplyDifficultyPreset();
+    }
+
+    // 難易度に応じてAIのパラメータをまとめて設定する
+    private void ApplyDifficultyPreset()
+    {
+        switch (difficulty)
+        {
+            case Difficulty.Easy:
+                reactionInterval = 1.4f;   // 判断が遅い
+                mistakeChance = 0.35f;     // ミスが多い
+                defenseAwareness = 0.3f;   // 攻撃されても気づきにくい
+                damageMultiplier = 0.8f;   // 与ダメージ控えめ
+                break;
+
+            case Difficulty.Normal:
+                reactionInterval = 1.0f;
+                mistakeChance = 0.12f;
+                defenseAwareness = 0.65f;
+                damageMultiplier = 1.0f;
+                break;
+
+            case Difficulty.Hard:
+                reactionInterval = 0.6f;   // 判断が速い
+                mistakeChance = 0.0f;      // ミスしない
+                defenseAwareness = 0.95f;  // 攻撃をほぼ見逃さない
+                damageMultiplier = 1.2f;   // 与ダメージ高め
+                break;
+        }
     }
 
     //当たり判定の子オブジェクト
@@ -164,7 +221,18 @@ public class Enemy : MonoBehaviour
             float distance = Mathf.Abs(Player.transform.position.z - transform.position.z);
             bool playerIsAttacking = Player.Player_status == test.Status.Attack;
 
+            // 難易度が低いほど、攻撃の気配に気づけないことがある(見逃し)
+            bool noticedAttack = playerIsAttacking && (Random.value <= defenseAwareness);
+
             ActionType action = ChooseAction(distance, playerIsAttacking);
+
+            // 難易度が低いほど、判断を誤ってランダムな行動を取ってしまうことがある
+            if (Random.value < mistakeChance)
+            {
+                System.Array values = System.Enum.GetValues(typeof(ActionType));
+                action = (ActionType)values.GetValue(Random.Range(0, values.Length));
+            }
+
             DoAction(action);
 
             /*switch (rand)
@@ -280,7 +348,6 @@ public class Enemy : MonoBehaviour
                 //移動(前進)
                 transform.Translate(0.0f, 0.0f, 0.125f);
             }*/
-
         }
 
         if(HP <= 10)
@@ -309,7 +376,7 @@ public class Enemy : MonoBehaviour
             else
             {
                 //プレイヤーに向かって移動
-                transform.Translate(0.0f, 0.0f, 0.025f);
+                transform.Translate(0.0f, 0.0f, 1.0f);
                 //animator.SetTrigger("Run");
                 Enemy_Status = Status.Neutral;
                 AtkHitboxOFF();
@@ -412,7 +479,7 @@ public class Enemy : MonoBehaviour
                 RightUpLeg.enabled = true;
 
                 //タイマーをリセット
-                ActionTimer = -1.0f;
+                ActionTimer = -reactionInterval;
                 break;
 
             case ActionType.Punch:
@@ -424,7 +491,7 @@ public class Enemy : MonoBehaviour
                 RightHand.enabled = true;
 
                 //タイマーをリセット
-                ActionTimer = -1.0f;
+                ActionTimer = -reactionInterval;
                 break;
 
             case ActionType.Approach:
@@ -446,13 +513,15 @@ public class Enemy : MonoBehaviour
                 Enemy_Collider.height = 0.65f;
                 Enemy_Collider.center = new Vector3(0, 0.5f, 0);
 
-                ActionTimer = 0.5f;
+                //しゃがみの硬直は判断間隔の半分
+                ActionTimer = reactionInterval * 0.5f;
                 break;
 
             case ActionType.Throw:
                 //つかみ
                 animator.SetTrigger("Throw");
-                ActionTimer = 1.0f;
+                //投げは硬直なし(すぐ次の判断に移れる)
+                ActionTimer = reactionInterval;
 
                 //投げれるか距離でチェック(距離と相手の状態で判断)
                 if (Player.Player_status != test.Status.Attack && (Player.transform.position.z - transform.position.z < 1.75f))
@@ -460,7 +529,7 @@ public class Enemy : MonoBehaviour
                     Debug.Log("投げ成功");
                     Player.transform.Translate(0.0f, 0.0f, -0.0025f);
                     Player.animator.SetTrigger("Thrown");
-                    Player.damege(5);
+                    Player.damege(Mathf.RoundToInt(5 * damageMultiplier));
                     flag = false;
                 }
                 break;
