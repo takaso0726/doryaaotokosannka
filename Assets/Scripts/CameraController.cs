@@ -1,18 +1,17 @@
 using System.Collections.Generic;
-using Unity.VisualScripting;
 using UnityEngine;
-using static UnityEngine.GraphicsBuffer;
 
-// 3D格闘ゲーム用カメラコントローラー
-// 出場中の全キャラクターの中心点（重心）を自動算出し、
-// カメラがその座標へスムーズに移動する。
-// キャラクター同士の距離に応じてズーム（カメラ距離）も自動調整する。
-
-public class CameraController : MonoBehaviour
+/// <summary>
+/// 3D格闘ゲーム用カメラコントローラー
+/// 出場中の全キャラクターの中心点（重心）を自動算出し、
+/// カメラがその座標へスムーズに移動する。
+/// キャラクター同士の距離に応じてズーム（カメラ距離）も自動調整する。
+/// </summary>
+public class FightingCameraController : MonoBehaviour
 {
     [Header("追従対象")]
     [Tooltip("現在出場中のキャラクターのTransformリスト。動的に増減してOK")]
-    public List<Transform> target = new List<Transform>();
+    public List<Transform> targets = new List<Transform>();
 
     [Header("カメラ追従設定")]
     [Tooltip("中心点への移動速度（大きいほど速く追従）")]
@@ -48,87 +47,141 @@ public class CameraController : MonoBehaviour
     private Vector3 _currentLookAtVelocity;
     private Vector3 _smoothedLookAt;
 
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
-        //_currentDistance = (maxZoomDistance + minZoomDistance) * 0.5f;
-        //_smoothedLookAt = CalculateCenterPoint();
+        _currentDistance = (maxZoomDistance + minZoomDistance) * 0.5f;
+        _smoothedLookAt = CalculateCenterPoint();
     }
-    /*
-    // Update is called once per frame
+
     void LateUpdate()
     {
         // 出場キャラクターがいない場合は何もしない
-        /*CleanupNullTargets();
-        if (players.Length == 0)
-            return;
+        CleanupNullTargets();
+        if (targets.Count == 0) return;
 
-        // 全員の中心座標を計算
-        Vector3 center = GetCenterPoint();
+        // 1. 中心点（重心）を算出
+        Vector3 centerPoint = CalculateCenterPoint();
 
-        // 中心から一番遠いプレイヤーまでの距離
-        float maxDistance = GetMaxDistance(center);
+        // 2. キャラクター間の広がり（最大距離）を算出してズーム量を決定
+        float spread = CalculateMaxSpread(centerPoint);
+        float targetDistance = Mathf.Clamp(
+            spread * spreadToDistanceMultiplier,
+            minZoomDistance,
+            maxZoomDistance
+        );
 
-        // カメラ位置
-        Vector3 targetPos =
-            center
-            + Vector3.up * height
-            - transform.forward * (distance + maxDistance * zoomMultiplier);
+        _currentDistance = Mathf.SmoothDamp(
+            _currentDistance,
+            targetDistance,
+            ref _velocityZoom,
+            zoomSmoothTime
+        );
 
-        // なめらかに移動
-        transform.position = Vector3.Lerp(
+        // 3. 注視点をスムーズに更新
+        Vector3 lookAtTarget = centerPoint + Vector3.up * lookAtHeightOffset;
+        _smoothedLookAt = Vector3.SmoothDamp(
+            _smoothedLookAt,
+            lookAtTarget,
+            ref _currentLookAtVelocity,
+            rotationSmoothTime
+        );
+
+        // 4. オフセット方向を距離に応じてスケーリングしてカメラ目標位置を算出
+        Vector3 offsetDirection = baseOffset.normalized;
+        Vector3 desiredCameraPos = _smoothedLookAt + offsetDirection * _currentDistance;
+
+        // 5. カメラ位置をスムーズに移動
+        transform.position = Vector3.SmoothDamp(
             transform.position,
-            targetPos,
-            smoothSpeed * Time.deltaTime);
+            desiredCameraPos,
+            ref _velocityPos,
+            followSmoothTime
+        );
 
-        // 常に中心を見る
-        transform.LookAt(center);
+        // 6. 常に中心点を見るように回転
+        transform.LookAt(_smoothedLookAt);
     }
 
-    Vector3 GetCenterPoint()
-    {
-        Vector3 sum = Vector3.zero;
-
-        foreach(Transform p in players)
-        {
-            sum += p.position;
-        }
-
-        return sum / players.Length;
-    }
-
-    float GetMaxDistance(Vector3 center)
-    {
-        float max = 0f;
-
-        foreach(Transform p in players)
-        {
-            float d = Vector3.Distance(center, p.position);
-
-            if(d > max)
-                max = d;
-        }
-
-        return max;
-    }
-
-    // 出場中の全キャラクターの中心点（重心）を算出する
+    /// <summary>
+    /// 出場中の全キャラクターの中心点（重心）を算出する
+    /// </summary>
     private Vector3 CalculateCenterPoint()
     {
+        if (targets.Count == 0) return transform.position;
 
+        Vector3 sum = Vector3.zero;
+        int count = 0;
+        foreach (var t in targets)
+        {
+            if (t == null) continue;
+            sum += t.position;
+            count++;
+        }
+
+        return count > 0 ? sum / count : transform.position;
     }
 
-    // 中心点から最も離れているキャラクターまでの距離（広がり具合）を算出する
-    // キャラクター同士が離れているほどカメラを引く（ズームアウト）ために使用
+    /// <summary>
+    /// 中心点から最も離れているキャラクターまでの距離（広がり具合）を算出する
+    /// キャラクター同士が離れているほどカメラを引く（ズームアウト）ために使用
+    /// </summary>
     private float CalculateMaxSpread(Vector3 center)
     {
-
+        float maxDist = 0f;
+        foreach (var t in targets)
+        {
+            if (t == null) continue;
+            float dist = Vector3.Distance(center, t.position);
+            if (dist > maxDist) maxDist = dist;
+        }
+        return maxDist;
     }
 
-    // リストからnull（撃破・非表示等で消えたキャラクター）を除去する
+    /// <summary>
+    /// リストからnull（撃破・非表示等で消えたキャラクター）を除去する
+    /// </summary>
     private void CleanupNullTargets()
     {
         targets.RemoveAll(t => t == null);
     }
-        */
+
+    /// <summary>
+    /// キャラクター出現時に呼び出して追従対象に追加する
+    /// </summary>
+    public void RegisterTarget(Transform t)
+    {
+        if (t != null && !targets.Contains(t))
+        {
+            targets.Add(t);
+        }
+    }
+
+    /// <summary>
+    /// キャラクター退場（撃破・リタイア等）時に呼び出して追従対象から除外する
+    /// </summary>
+    public void UnregisterTarget(Transform t)
+    {
+        if (targets.Contains(t))
+        {
+            targets.Remove(t);
+        }
+    }
+
+    // デバッグ用：シーンビューに中心点と広がり範囲を可視化
+    private void OnDrawGizmosSelected()
+    {
+        if (targets == null || targets.Count == 0) return;
+
+        Vector3 center = CalculateCenterPoint();
+
+        Gizmos.color = Color.red;
+        Gizmos.DrawSphere(center, 0.3f);
+
+        Gizmos.color = Color.yellow;
+        foreach (var t in targets)
+        {
+            if (t == null) continue;
+            Gizmos.DrawLine(center, t.position);
+        }
+    }
 }

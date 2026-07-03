@@ -1,9 +1,10 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 public class Enemy : MonoBehaviour
 {
     //変数宣言
-    int rand;           //乱数用変数
+    //int rand;           //乱数用変数
     float ActionTimer;  //タイマー
     public int atk;
     public int HP;
@@ -33,6 +34,35 @@ public class Enemy : MonoBehaviour
     public ParticleSystem Men_particle;     //仁王立ち用のパーティクル
     public ParticleSystem Hit_particle;     //ヒット時用のパーティクル
 
+    public FightingCameraController cameraController;
+    private int currentHP = 100;
+
+    // ---- CPU AI 用 ----
+    // 行動の種類。ランダム値(1〜7)の代わりにこの列挙体で意図を表す
+    private enum ActionType
+    {
+        Approach,   //接近
+        Retreat,    //後退
+        Kick,       //キック攻撃
+        Punch,      //パンチ攻撃
+        Throw,      //投げ
+        Crouch,     //しゃがみ(回避寄り)
+        Stand,      //仁王立ち(フェイント/カウンター狙い)
+        Idle,       //何もしない(様子見)
+    }
+
+    // 距離の閾値。この値を境に「近距離/中距離/遠距離」を切り替える
+    [Header("CPU AI設定")]
+    public float nearRange = 1.8f;
+    public float midRange = 3.5f;
+
+    void Awake()
+    {
+        // シーン内のカメラコントローラーを自動取得したい場合
+        if (cameraController == null)
+            cameraController = FindAnyObjectByType<FightingCameraController>();
+    }
+
     //当たり判定の子オブジェクト
     CapsuleCollider Head;
     CapsuleCollider RightArm;
@@ -56,7 +86,7 @@ public class Enemy : MonoBehaviour
     {
         
         ActionTimer = 0.0f;
-        rand = Random.Range(1, 6);
+        //rand = Random.Range(1, 6);
         rb = GetComponent<Rigidbody>();		//EnemyのRigidbodyを取得
         atk = 10;
         HP = 100;
@@ -68,6 +98,8 @@ public class Enemy : MonoBehaviour
         //頭の当たり判定
         Head = GameObject.Find("Head").gameObject.GetComponent<CapsuleCollider>();
 
+        // 自分自身をカメラの追従対象に登録
+        cameraController.RegisterTarget(transform);
 
         //右腕の当たり判定
         RightArm = GameObject.Find("RightArm").gameObject.GetComponent<CapsuleCollider>();
@@ -127,7 +159,15 @@ public class Enemy : MonoBehaviour
                 Enemy_Collider.center = new Vector3(0, 1.0f, 0);
             }
 
-            switch (rand)
+            // ==== ここからがCPUの「判断」部分 ====
+            // プレイヤーとの距離、プレイヤーが攻撃中かどうかを見て行動を選ぶ
+            float distance = Mathf.Abs(Player.transform.position.z - transform.position.z);
+            bool playerIsAttacking = Player.Player_status == test.Status.Attack;
+
+            ActionType action = ChooseAction(distance, playerIsAttacking);
+            DoAction(action);
+
+            /*switch (rand)
             {
                 case 1:
                     //仁王立ち
@@ -239,8 +279,7 @@ public class Enemy : MonoBehaviour
             {
                 //移動(前進)
                 transform.Translate(0.0f, 0.0f, 0.125f);
-            }
-          
+            }*/
 
         }
 
@@ -276,16 +315,162 @@ public class Enemy : MonoBehaviour
                 AtkHitboxOFF();
             }
         }
-        
-
     }
-    /*
 
+    // 距離とプレイヤーの状態から、次に取る行動を重み付き抽選で決める
+    private ActionType ChooseAction(float distance, bool playerIsAttacking)
+    {
+        List<(ActionType action, float weight)> table = new List<(ActionType, float)>();
 
-  
-}
-    */
+        if (distance > midRange)
+        {
+            // 遠距離: 基本は接近。たまにフェイントで様子を見る
+            table.Add((ActionType.Approach, 0.7f));
+            table.Add((ActionType.Stand, 0.15f));
+            table.Add((ActionType.Idle, 0.15f));
+        }
+        else if (distance > nearRange)
+        {
+            // 中距離: 接近しつつ、相手が攻撃中なら距離を取る
+            if (playerIsAttacking)
+            {
+                table.Add((ActionType.Retreat, 0.5f));
+                table.Add((ActionType.Crouch, 0.3f));
+                table.Add((ActionType.Idle, 0.2f));
+            }
+            else
+            {
+                table.Add((ActionType.Approach, 0.45f));
+                table.Add((ActionType.Kick, 0.25f));
+                table.Add((ActionType.Retreat, 0.15f));
+                table.Add((ActionType.Idle, 0.15f));
+            }
+        }
+        else
+        {
+            // 近距離: 攻撃の主戦場。相手が攻撃中なら防御寄りの行動を優先
+            if (playerIsAttacking)
+            {
+                table.Add((ActionType.Crouch, 0.35f));
+                table.Add((ActionType.Retreat, 0.25f));
+                table.Add((ActionType.Punch, 0.2f));
+                table.Add((ActionType.Kick, 0.2f));
+            }
+            else
+            {
+                table.Add((ActionType.Punch, 0.3f));
+                table.Add((ActionType.Kick, 0.25f));
+                table.Add((ActionType.Throw, 0.25f));
+                table.Add((ActionType.Stand, 0.1f));
+                table.Add((ActionType.Retreat, 0.1f));
+            }
+        }
 
+        float total = 0f;
+        foreach (var entry in table) total += entry.weight;
+
+        float roll = Random.Range(0f, total);
+        float cumulative = 0f;
+        foreach (var entry in table)
+        {
+            cumulative += entry.weight;
+            if (roll <= cumulative)
+                return entry.action;
+        }
+
+        return ActionType.Idle; // 保険(基本ここには来ない)
+    }
+
+    // 選ばれた行動を実際に実行する(以前の switch(rand) の中身を移植)
+    private void DoAction(ActionType action)
+    {
+        switch (action)
+        {
+            case ActionType.Stand:
+                //仁王立ち
+                Enemy_Status = Status.Stand;
+                Menflag = true;
+                ActionTimer = 0.0f;
+
+                // パーティクルシステムのインスタンスを生成する。
+                ParticleSystem newParticle = Instantiate(Men_particle, new Vector3(transform.position.x, transform.position.y + 1.0f, transform.position.z),
+                    Quaternion.Euler(-90.0f, 0.0f, 0.0f));
+                // パーティクルを発生させる。
+                newParticle.Play();
+                // ※第一引数をnewParticleだけにするとコンポーネントしか削除されない。
+                Destroy(newParticle.gameObject, 1.0f);
+                break;
+
+            case ActionType.Kick:
+                //攻撃(キック)
+                animator.SetTrigger("Kick");
+                Enemy_Status = Status.Attack;
+
+                //当たり判定をON
+                RightFoot.enabled = true;
+                RightLeg.enabled = true;
+                RightUpLeg.enabled = true;
+
+                //タイマーをリセット
+                ActionTimer = -1.0f;
+                break;
+
+            case ActionType.Punch:
+                //攻撃(パンチ)
+                animator.SetTrigger("Punch");
+                Enemy_Status = Status.Attack;
+
+                //当たり判定をON
+                RightHand.enabled = true;
+
+                //タイマーをリセット
+                ActionTimer = -1.0f;
+                break;
+
+            case ActionType.Approach:
+                //移動(前進)
+                transform.Translate(0.0f, 0.0f, 0.125f);
+                ActionTimer = 0.0f;
+                break;
+
+            case ActionType.Retreat:
+                //移動(後退)
+                transform.Translate(0.0f, 0.0f, -0.125f);
+                ActionTimer = 0.0f;
+                break;
+
+            case ActionType.Crouch:
+                //しゃがみ
+                animator.SetBool("Crouch", true);
+                //当たり判定を下げる
+                Enemy_Collider.height = 0.65f;
+                Enemy_Collider.center = new Vector3(0, 0.5f, 0);
+
+                ActionTimer = 0.5f;
+                break;
+
+            case ActionType.Throw:
+                //つかみ
+                animator.SetTrigger("Throw");
+                ActionTimer = 1.0f;
+
+                //投げれるか距離でチェック(距離と相手の状態で判断)
+                if (Player.Player_status != test.Status.Attack && (Player.transform.position.z - transform.position.z < 1.75f))
+                {
+                    Debug.Log("投げ成功");
+                    Player.transform.Translate(0.0f, 0.0f, -0.0025f);
+                    Player.animator.SetTrigger("Thrown");
+                    Player.damege(5);
+                    flag = false;
+                }
+                break;
+
+            case ActionType.Idle:
+                //何もしない(様子見)
+                ActionTimer = 0.0f;
+                break;
+        }
+    }
 
     //接触判定を行い、他のGameObjectと当たった時に呼び出される関数
     private void OnTriggerEnter(Collider collision)
@@ -359,6 +544,24 @@ public class Enemy : MonoBehaviour
         HP -= n;
         GameMNG mng = GameObject.Find("ManagerObject").GetComponent<GameMNG>();
         mng.Enemy_ReduceHP(HP);
+    }
+
+    public void TakeDamage(int damage)
+    {
+        currentHP -= damage;
+        if (currentHP <= 0)
+        {
+            Die();
+        }
+    }
+
+    private void Die()
+    {
+        // 撃破時にカメラの追従対象から除外
+        cameraController.UnregisterTarget(transform);
+
+        // 退場演出など
+        Destroy(gameObject, 1.5f);
     }
 }
 
