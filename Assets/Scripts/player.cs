@@ -25,6 +25,7 @@ public class test : MonoBehaviour
 
     int Control_I;                  //操作の入力から分岐するための変数
 
+    bool hasHit = false; // 攻撃の判定用の変数
     //効果音用
     AudioSource se;
     public AudioClip MenBlock_se;
@@ -133,6 +134,8 @@ public class test : MonoBehaviour
         //効果音再生用のAudioClipを取得
         se = GetComponent<AudioSource>();
 
+        AtkHitboxOFF();
+
         flag = true;
     }
 
@@ -153,6 +156,9 @@ public class test : MonoBehaviour
                 }
                 Menflag = false;
                 AttackCnt = 0;
+                //攻撃の当たり判定をリセットし次の攻撃が当たるように
+                hasHit = false;
+
                 //攻撃用の当たり判定を非Activeにする
                 AtkHitboxOFF();
                 flag = true;
@@ -165,215 +171,217 @@ public class test : MonoBehaviour
         }
 
         //<入力チェック>
-        //右移動(前)
-        if(Gamepad.current != null)
+        if (HP > 0)
         {
-            if //(Keyboard.current.dKey.wasPressedThisFrame && Controlflag)
-            (Gamepad.current.leftStick.value.x >= 0.03 && Controlflag)
+            //右移動(前)
+            if (Gamepad.current != null)
             {
-                //操作用変数に代入
-                Control_I = 1;
-                //操作可能フラグをOFF
-                //Controlflag = false;
-            }
-            //左移動(後ろ)
-            if //(Keyboard.current.aKey.wasPressedThisFrame && Controlflag)
-            (Gamepad.current.leftStick.value.x <= -0.03 && Controlflag)
-            {
-                //操作用変数に代入
-                Control_I = 2;
-                //操作可能フラグをOFF
-                //Controlflag = false;
-
-            }
-            //ジャンプ
-            if //(Keyboard.current.wKey.wasPressedThisFrame && Controlflag && Jumpflag)
-            (Gamepad.current.xButton.wasPressedThisFrame && (Jumpflag && Controlflag))
-            {
-                //デバックログの表示
-                Debug.Log("ジャンプ");
-                //操作用変数に代入
-                Control_I = 3;
-                //操作可能フラグをOFF
-                Controlflag = false;
-            }
-            //しゃがみ
-            /*if (Gamepad.current.leftStick.value.y <= -0.43 && Controlflag)
-            //(Keyboard.current.sKey.wasPressedThisFrame && Controlflag && Jumpflag)
-            {
-                //操作用変数に代入
-                Control_I = 10;
-            }
-            else if (Gamepad.current.leftStick.value.y >= 0.0 && Controlflag)
-            {
-                Control_I = 0;
-                animator.SetBool("Crouch", false);
-
-                //当たり判定を上げる
-                Player_Collider.height = 2.0f;
-                Player_Collider.center = new Vector3(0, 1.0f, 0);
-
-            }
-            */
-            bool isCrouching = Gamepad.current.leftStick.value.y <= -0.43f;
-
-            if (isCrouching && Controlflag)
-            {
-                Control_I = 10;
-            }
-            else
-            {
-                // しゃがみ解除の見た目処理だけ行い、Control_Iは触らない
-                if (animator.GetBool("Crouch"))
+                if //(Keyboard.current.dKey.wasPressedThisFrame && Controlflag)
+                (Gamepad.current.leftStick.value.x >= 0.03 && Controlflag)
                 {
+                    //操作用変数に代入
+                    Control_I = 1;
+                    //操作可能フラグをOFF
+                    //Controlflag = false;
+                }
+                //左移動(後ろ)
+                if //(Keyboard.current.aKey.wasPressedThisFrame && Controlflag)
+                (Gamepad.current.leftStick.value.x <= -0.03 && Controlflag)
+                {
+                    //操作用変数に代入
+                    Control_I = 2;
+                    //操作可能フラグをOFF
+                    //Controlflag = false;
+
+                }
+                //ジャンプ
+                if //(Keyboard.current.wKey.wasPressedThisFrame && Controlflag && Jumpflag)
+                (Gamepad.current.xButton.wasPressedThisFrame && (Jumpflag && Controlflag))
+                {
+                    //デバックログの表示
+                    Debug.Log("ジャンプ");
+                    //操作用変数に代入
+                    Control_I = 3;
+                    //操作可能フラグをOFF
+                    Controlflag = false;
+                }
+                //しゃがみ
+                /*if (Gamepad.current.leftStick.value.y <= -0.43 && Controlflag)
+                //(Keyboard.current.sKey.wasPressedThisFrame && Controlflag && Jumpflag)
+                {
+                    //操作用変数に代入
+                    Control_I = 10;
+                }
+                else if (Gamepad.current.leftStick.value.y >= 0.0 && Controlflag)
+                {
+                    Control_I = 0;
                     animator.SetBool("Crouch", false);
+
+                    //当たり判定を上げる
                     Player_Collider.height = 2.0f;
                     Player_Collider.center = new Vector3(0, 1.0f, 0);
+
                 }
-            }
+                */
+                bool isCrouching = Gamepad.current.leftStick.value.y <= -0.43f;
 
-            //パンチ
-            if //(Keyboard.current.qKey.wasPressedThisFrame && Controlflag)
-            ((Gamepad.current.bButton.wasPressedThisFrame) && Controlflag)
-            {
-                //デバックログの表示
-                Debug.Log("パンチ");
-
-                // 予約をすべてクリア
-                animator.ResetTrigger("Punch");
-                animator.ResetTrigger("Flying-kick");
-                animator.ResetTrigger("Kick");
-                animator.ResetTrigger("Jump");
-                //操作用変数に代入
-                Control_I = 4;
-                //操作可能フラグをOFF
-                Controlflag = false;
-
-            }
-            //キック
-            if  //(Keyboard.current.zKey.wasPressedThisFrame && Controlflag)
-               (Gamepad.current.aButton.wasPressedThisFrame && Controlflag)
-            {
-                // 予約をすべてクリア
-                animator.ResetTrigger("Punch");
-                animator.ResetTrigger("Flying-kick");
-                animator.ResetTrigger("Kick");
-                animator.ResetTrigger("Jump");
-
-                if//(Keyboard.current.wKey.wasPressedThisFrame)
-                    (Gamepad.current.leftStick.value.y < -0.43f)
+                if (isCrouching && Controlflag)
                 {
-                    //デバックログの表示
-                    Debug.Log("下キック");
-                    Control_I = 8;
-                }
-                else if//(Keyboard.current.sKey.wasPressedThisFrame)
-                    (Gamepad.current.leftStick.value.y > 0.25f)
-                {
-                    //デバックログの表示
-                    Debug.Log("上キック");
-
-                    Control_I = 9;
+                    Control_I = 10;
                 }
                 else
                 {
-                    //デバックログの表示
-                    Debug.Log("キック");
-
-                    //操作用変数に代入
-                    Control_I = 5;
+                    // しゃがみ解除の見た目処理だけ行い、Control_Iは触らない
+                    if (animator.GetBool("Crouch"))
+                    {
+                        animator.SetBool("Crouch", false);
+                        Player_Collider.height = 2.0f;
+                        Player_Collider.center = new Vector3(0, 1.0f, 0);
+                    }
                 }
 
-                //操作可能フラグをOFF
-                Controlflag = false;
-            }
-            //仁王立ち
-            if //(Keyboard.current.eKey.wasPressedThisFrame && Controlflag)
-            (Gamepad.current.yButton.wasPressedThisFrame && Controlflag)
-            {
-                //デバックログの表示
-                Debug.Log("仁王立ち");
-                //操作用変数に代入
-                Control_I = 6;
-                Controlflag = false;
-            }
-            //投げ
-            if//(Keyboard.current.xKey.wasPressedThisFrame && Controlflag)
-            (Gamepad.current.rightShoulder.wasPressedThisFrame && Controlflag)
-            {
-                //デバックログの表示
-                Debug.Log("掴み");
+                //パンチ
+                if //(Keyboard.current.qKey.wasPressedThisFrame && Controlflag)
+                ((Gamepad.current.bButton.wasPressedThisFrame) && Controlflag)
+                {
+                    //デバックログの表示
+                    Debug.Log("パンチ");
 
-                //操作用変数に代入
-                Control_I = 7;
-                Controlflag = false;
-            }
-        }
+                    // 予約をすべてクリア
+                    animator.ResetTrigger("Punch");
+                    animator.ResetTrigger("Flying-kick");
+                    animator.ResetTrigger("Kick");
+                    animator.ResetTrigger("Jump");
+                    //操作用変数に代入
+                    Control_I = 4;
+                    //操作可能フラグをOFF
+                    Controlflag = false;
 
-        switch (Control_I)
-        {
-            case 0:
-                //待機
-                AttackCnt = 0;
-                break;
+                }
+                //キック
+                if  //(Keyboard.current.zKey.wasPressedThisFrame && Controlflag)
+                   (Gamepad.current.aButton.wasPressedThisFrame && Controlflag)
+                {
+                    // 予約をすべてクリア
+                    animator.ResetTrigger("Punch");
+                    animator.ResetTrigger("Flying-kick");
+                    animator.ResetTrigger("Kick");
+                    animator.ResetTrigger("Jump");
 
-            case 1:
-                //前に移動
-                Movefront();
-                break;
+                    if//(Keyboard.current.wKey.wasPressedThisFrame)
+                        (Gamepad.current.leftStick.value.y < -0.43f)
+                    {
+                        //デバックログの表示
+                        Debug.Log("下キック");
+                        Control_I = 8;
+                    }
+                    else if//(Keyboard.current.sKey.wasPressedThisFrame)
+                        (Gamepad.current.leftStick.value.y > 0.25f)
+                    {
+                        //デバックログの表示
+                        Debug.Log("上キック");
 
-            case 2:
-                //後ろに移動
-                Moveback();
-                break;
+                        Control_I = 9;
+                    }
+                    else
+                    {
+                        //デバックログの表示
+                        Debug.Log("キック");
 
-            case 3:
-                //ジャンプ
-                Jumpflag = false;
-                Movejump();
-                break;
+                        //操作用変数に代入
+                        Control_I = 5;
+                    }
 
-            case 4:
-                //弱攻撃(パンチ)
-                //0.5秒遅延してから実行
-                Attack_punch();
-                break;
-
-            case 5:
-                //強攻撃(キック)
-                Attack_kick();
-                break;
-
-            case 6:
+                    //操作可能フラグをOFF
+                    Controlflag = false;
+                }
                 //仁王立ち
-                Standing();
-                break;
-
-            case 7:
+                if //(Keyboard.current.eKey.wasPressedThisFrame && Controlflag)
+                (Gamepad.current.yButton.wasPressedThisFrame && Controlflag)
+                {
+                    //デバックログの表示
+                    Debug.Log("仁王立ち");
+                    //操作用変数に代入
+                    Control_I = 6;
+                    Controlflag = false;
+                }
                 //投げ
-                //□秒遅延してから実行
-                Throwing();
-                break;
+                if//(Keyboard.current.xKey.wasPressedThisFrame && Controlflag)
+                (Gamepad.current.rightShoulder.wasPressedThisFrame && Controlflag)
+                {
+                    //デバックログの表示
+                    Debug.Log("掴み");
 
-            case 8:
-                //下キック
-                //遅延無し実行
-                DonwnKick();
-                break;
+                    //操作用変数に代入
+                    Control_I = 7;
+                    Controlflag = false;
+                }
+            }
 
-            case 9:
-                //下キック
-                //遅延0.4秒で実行　
-                UpKick();
-                break;
+            switch (Control_I)
+            {
+                case 0:
+                    //待機
+                    AttackCnt = 0;
+                    break;
 
-            case 10:
-                //しゃがみ
-                //遅延無し実行
-                Crouch();
-                break;
+                case 1:
+                    //前に移動
+                    Movefront();
+                    break;
+
+                case 2:
+                    //後ろに移動
+                    Moveback();
+                    break;
+
+                case 3:
+                    //ジャンプ
+                    Jumpflag = false;
+                    Movejump();
+                    break;
+
+                case 4:
+                    //弱攻撃(パンチ)
+                    //0.5秒遅延してから実行
+                    Attack_punch();
+                    break;
+
+                case 5:
+                    //強攻撃(キック)
+                    Attack_kick();
+                    break;
+
+                case 6:
+                    //仁王立ち
+                    Standing();
+                    break;
+
+                case 7:
+                    //投げ
+                    //□秒遅延してから実行
+                    Throwing();
+                    break;
+
+                case 8:
+                    //下キック
+                    //遅延無し実行
+                    DonwnKick();
+                    break;
+
+                case 9:
+                    //下キック
+                    //遅延0.4秒で実行　
+                    UpKick();
+                    break;
+
+                case 10:
+                    //しゃがみ
+                    //遅延無し実行
+                    Crouch();
+                    break;
+            }
         }
-
     }
 
     void OnCollisionEnter(Collision other)
@@ -390,6 +398,10 @@ public class test : MonoBehaviour
         //当たった対象物の[tag]がEAttack (エネミーによる攻撃)だった場合は処理する
         if (collision.gameObject.CompareTag("EAttack") && HP > 0)
         {
+
+            // 攻撃は一回だけ判定
+            hasHit = true;
+
             //体力を表示
             Debug.Log("プレイヤーのHP : " + HP);
 
@@ -428,6 +440,11 @@ public class test : MonoBehaviour
             mng.Player_ReduceHP(HP);
             enemy.atk = 10;
 
+            // HPが0以下にならないように調整
+            if (HP < 0)
+            {
+                HP = 0;
+            }
         }
     }
 

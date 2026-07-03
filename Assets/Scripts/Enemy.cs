@@ -234,122 +234,9 @@ public class Enemy : MonoBehaviour
             }
 
             DoAction(action);
-
-            /*switch (rand)
-            {
-                case 1:
-                    //仁王立ち
-
-                    Enemy_Status = Status.Stand;
-
-                    Menflag = true;
-                    ActionTimer = 0.0f;
-                    // パーティクルシステムのインスタンスを生成する。
-                    ParticleSystem newParticle = Instantiate(Men_particle, new Vector3(transform.position.x, transform.position.y + 1.0f, transform.position.z),
-                        Quaternion.Euler(-90.0f, 0.0f, 0.0f));
-
-                    // パーティクルを発生させる。
-                    newParticle.Play();
-                    // ※第一引数をnewParticleだけにするとコンポーネントしか削除されない。
-                    Destroy(newParticle.gameObject, 1.0f);
-
-                    rand = Random.Range(1, 7);
-                    break;
-
-
-                case 2:
-                    //攻撃(キック)
-                    animator.SetTrigger("Kick");
-
-                    Enemy_Status = Status.Attack;
-
-                    //当たり判定をON
-                    RightFoot.enabled = true;
-                    RightLeg.enabled = true;
-                    RightUpLeg.enabled = true;
-
-                    //タイマーをリセット
-                    ActionTimer = -1.0f;
-                    rand = Random.Range(1, 7);
-                    break;
-
-                case 3:
-                    //攻撃(パンチ)
-                    animator.SetTrigger("Punch");
-
-                    Enemy_Status = Status.Attack;
-
-                    //当たり判定をON
-                    RightHand.enabled = true;
-
-                    //タイマーをリセット
-                    ActionTimer = -1.0f;
-                    rand = Random.Range(1, 7);
-                    break;
-                case 4:
-                    //攻撃(パンチ)
-                    animator.SetTrigger("Punch");
-                    //エネミーのステータスを[攻撃]に変える
-                    Enemy_Status = Status.Attack;
-                    //当たり判定をON
-                    RightHand.enabled = true;
-                    //タイマーをリセット
-                    ActionTimer = -1.0f;
-                    rand = Random.Range(1, 7);
-                    break;
-
-                case 5:
-                    //移動(前進)
-                    transform.Translate(0.0f, 0.0f, 0.025f);
-                    //タイマーをリセット
-                    ActionTimer = 0.0f;
-                    rand = Random.Range(1, 7);
-                    break;
-
-                case 6:
-                    //しゃがみ
-                    animator.SetBool("Crouch", true);
-                    //当たり判定を下げる
-                    Enemy_Collider.height = 0.65f;
-                    Enemy_Collider.center = new Vector3(0, 0.5f, 0);
-
-
-                    ActionTimer = 0.5f;
-                    rand = Random.Range(1, 7);
-                    break;
-
-                case 7:
-                    //つかみ
-                    animator.SetTrigger("Throw");
-                    ActionTimer = 1.0f;
-                    rand = Random.Range(1, 7);
-
-                    //投げれるか距離でチェック(距離と相手の状態で判断したい)
-                    if (Player.Player_status != test.Status.Attack && (Player.transform.position.z - transform.position.z < 1.75f))
-                    {
-                        Debug.Log("投げ成功");
-                        Player.transform.Translate(0.0f, 0.0f, -0.0025f);
-                        Player.animator.SetTrigger("Thrown");
-                        Player.damege(5);
-                        flag = false;
-                    }
-
-                    break;
-
-            }
-
-            if (rand == 1)
-            {
-                //移動(後退)
-                transform.Translate(0.0f, 0.0f, -0.125f);
-            }
-            else if (rand == 2)
-            {
-                //移動(前進)
-                transform.Translate(0.0f, 0.0f, 0.125f);
-            }*/
         }
 
+        //タックル
         if(HP <= 10)
         {
             if ((Mathf.Sqrt((transform.position.z - Player.transform.position.z) * (transform.position.z - Player.transform.position.z))) < 3.0f && Enemy_Status == Status.Neutral)
@@ -426,8 +313,8 @@ public class Enemy : MonoBehaviour
             else
             {
                 table.Add((ActionType.Punch, 0.3f));
-                table.Add((ActionType.Kick, 0.25f));
-                table.Add((ActionType.Throw, 0.25f));
+                table.Add((ActionType.Kick, 0.5f));
+                table.Add((ActionType.Throw, 0.0f));
                 table.Add((ActionType.Stand, 0.1f));
                 table.Add((ActionType.Retreat, 0.1f));
             }

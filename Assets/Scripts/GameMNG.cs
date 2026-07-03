@@ -37,6 +37,7 @@ public class GameMNG : MonoBehaviour
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
+        
         PlayerHP_Text.text = "100";
         EnemyHP_Text.text = "100";
         PlayerHP = 100;
