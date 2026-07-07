@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Rendering; // 被写界深度(背景ボケ)用のVolume制御に使用
 
 /// <summary>
 /// 3D格闘ゲーム用カメラコントローラー
@@ -47,6 +48,51 @@ public class FightingCameraController : MonoBehaviour
     [Tooltip("フォーカス演出時、対象を見る高さオフセット")]
     public float focusLookAtHeightOffset = 1.2f;
 
+    [Header("仁王立ち被弾演出（ガードインパクトカメラ）")]
+    [Tooltip("被弾した瞬間、対象からどれだけ離れるか（かなり近距離にして威圧感を出す）")]
+    public float guardImpactDistance = 2.2f;
+
+    [Tooltip("カメラの高さ（地面に近いほどローアングルになる）")]
+    public float guardImpactCamHeight = 0.4f;
+
+    [Tooltip("正面に対してどれだけ横に回り込むか（度）。斜めからの見上げ画角になる")]
+    public float guardImpactHorizontalAngle = 35f;
+
+    [Tooltip("ONにするとキャラクターの正面側（顔が見える側）にカメラを配置する。モデルのForwardが逆向きの場合はOFFにして調整する")]
+    public bool guardImpactFilmFromFront = true;
+
+    [Tooltip("見上げる注視点の高さ（頭上あたりを見ることで見上げ角が強調される）")]
+    public float guardImpactLookAtHeight = 1.9f;
+
+    [Tooltip("突入時のカメラ移動の速さ（小さいほど素早くグッと寄る）")]
+    public float guardImpactMoveInSmoothTime = 0.08f;
+
+    [Tooltip("新たな被弾が無い場合、この演出を継続する時間（秒）。連続被弾時はリセットされ続く")]
+    public float guardImpactHoldDuration = 0.6f;
+
+    [Header("被弾シェイク設定")]
+    [Tooltip("1回目のガード成功時の揺れの強さ")]
+    public float shakeBaseAmplitude = 0.05f;
+
+    [Tooltip("連続ガード1回ごとに加算される揺れの強さ")]
+    public float shakeAmplitudePerCombo = 0.04f;
+
+    [Tooltip("揺れの強さの上限（これ以上は大きくならない）")]
+    public float shakeMaxAmplitude = 0.4f;
+
+    [Tooltip("揺れの細かさ（大きいほど小刻みに震える）")]
+    public float shakeFrequency = 25f;
+
+    [Header("背景ボケ（被写界深度）連携")]
+    [Tooltip("被写界深度(Depth of Field)を設定したVolumeを割り当てる（URP/HDRP共通）。未設定でも動作する")]
+    public Volume guardImpactVolume;
+
+    [Tooltip("演出中に持っていくVolumeのWeight（1でDOFの効果が全開になる）")]
+    public float guardImpactVolumeWeight = 1f;
+
+    [Tooltip("Volumeの重みが切り替わる速さ")]
+    public float volumeWeightSmoothSpeed = 8f;
+
     // 内部状態
     private Vector3 _velocityPos;   // SmoothDamp用
     private float _velocityZoom;    // SmoothDamp用（float）
@@ -58,6 +104,14 @@ public class FightingCameraController : MonoBehaviour
     private bool _isFocusMode = false;
     private Transform _focusTarget;
 
+    // 仁王立ち被弾（ガードインパクト）関連
+    private bool _isGuardImpactMode = false;
+    private Transform _guardImpactTarget;
+    private int _guardImpactComboCount = 0;
+    private float _guardImpactHoldTimer = 0f;
+    private Vector3 _guardImpactVelocityPos;
+    private float _currentVolumeWeight = 0f;
+
     void Start()
     {
         _currentDistance = (maxZoomDistance + minZoomDistance) * 0.5f;
@@ -66,6 +120,15 @@ public class FightingCameraController : MonoBehaviour
 
     void LateUpdate()
     {
+        // Volumeの重みは常にスムーズに追従させる（演出のON/OFFに関わらず処理）
+        UpdateGuardImpactVolume();
+
+        // 仁王立ちで攻撃を受け止めた直後は、最優先でローアングルの被弾カメラを処理する
+        if (_isGuardImpactMode)
+        {
+            UpdateGuardImpactCamera();
+            return;
+        }
 
         // 勝敗が決まり、勝者へのフォーカス演出中の場合は専用の処理を行う
         if (_isFocusMode)
@@ -204,6 +267,107 @@ public class FightingCameraController : MonoBehaviour
 
         // 常に勝者を見るように回転
         transform.LookAt(_smoothedLookAt);
+    }
+
+    /// <summary>
+    /// 仁王立ち中に攻撃を受け止めた瞬間、GameMNGやプレイヤースクリプトから呼び出す。
+    /// 対象キャラの斜め下からのローアングルにグッとズームし、
+    /// 連続で耐えるほどシェイクが強くなる（comboCountを都度加算して渡すこと）。
+    /// </summary>
+    /// <param name="target">受け止めたキャラクターのTransform</param>
+    /// <param name="comboCount">現在の連続ガード成功回数（1回目なら1）</param>
+    public void OnGuardImpact(Transform target, int comboCount)
+    {
+        if (target == null) return;
+
+        _isGuardImpactMode = true;
+        _guardImpactTarget = target;
+        _guardImpactComboCount = Mathf.Max(1, comboCount);
+        _guardImpactHoldTimer = guardImpactHoldDuration;
+    }
+
+    /// <summary>
+    /// ガードインパクト演出を強制的に終了し、通常の追従モードへ戻す
+    /// </summary>
+    public void ClearGuardImpact()
+    {
+        _isGuardImpactMode = false;
+        _guardImpactTarget = null;
+        _guardImpactComboCount = 0;
+    }
+
+    /// <summary>
+    /// ガードインパクトカメラの毎フレーム更新処理
+    /// </summary>
+    private void UpdateGuardImpactCamera()
+    {
+        // 対象が消えていたら演出を打ち切って通常モードへ戻す
+        if (_guardImpactTarget == null)
+        {
+            ClearGuardImpact();
+            return;
+        }
+
+        // 新たな被弾が無いまま時間が経過したら通常モードへ戻す
+        _guardImpactHoldTimer -= Time.deltaTime;
+        if (_guardImpactHoldTimer <= 0f)
+        {
+            ClearGuardImpact();
+            return;
+        }
+
+        // 1. 見上げる注視点（対象の頭上あたり）を設定
+        Vector3 lookAtTarget = _guardImpactTarget.position + Vector3.up * guardImpactLookAtHeight;
+
+        // 2. 対象の向きを基準に、斜め横・低い位置へ回り込んだカメラ位置を算出
+        //    guardImpactFilmFromFrontがtrueなら「正面（顔が見える側）」、falseなら背後側を基準にする
+        Vector3 baseDir = guardImpactFilmFromFront ? _guardImpactTarget.forward : -_guardImpactTarget.forward;
+        Vector3 diagonalDir = Quaternion.AngleAxis(guardImpactHorizontalAngle, Vector3.up) * baseDir;
+        Vector3 desiredCameraPos = _guardImpactTarget.position + diagonalDir.normalized * guardImpactDistance;
+        desiredCameraPos.y = _guardImpactTarget.position.y + guardImpactCamHeight;
+
+        // 3. グッと素早く寄るように、通常より短いスムーズタイムで移動
+        Vector3 smoothedPos = Vector3.SmoothDamp(
+            transform.position,
+            desiredCameraPos,
+            ref _guardImpactVelocityPos,
+            guardImpactMoveInSmoothTime
+        );
+
+        // 4. 連続ガード回数に応じてシェイクの強さを決定（上限あり）
+        float amplitude = Mathf.Min(
+            shakeBaseAmplitude + shakeAmplitudePerCombo * (_guardImpactComboCount - 1),
+            shakeMaxAmplitude
+        );
+        float t = Time.time * shakeFrequency;
+        Vector3 shakeOffset = new Vector3(
+            (Mathf.PerlinNoise(t, 0f) - 0.5f) * 2f,
+            (Mathf.PerlinNoise(0f, t) - 0.5f) * 2f,
+            (Mathf.PerlinNoise(t, t) - 0.5f) * 2f
+        ) * amplitude;
+
+        // 5. シェイクを乗せた最終位置を反映し、見上げる注視点を向く
+        transform.position = smoothedPos + shakeOffset;
+        transform.LookAt(lookAtTarget);
+
+        // 通常モードに戻ったときに違和感が出ないよう、注視点の内部状態も合わせておく
+        _smoothedLookAt = lookAtTarget;
+    }
+
+    /// <summary>
+    /// 背景ボケ用VolumeのWeightを、演出中は1、通常時は0へスムーズに追従させる
+    /// </summary>
+    private void UpdateGuardImpactVolume()
+    {
+        if (guardImpactVolume == null) return;
+
+        float targetWeight = _isGuardImpactMode ? guardImpactVolumeWeight : 0f;
+        _currentVolumeWeight = Mathf.MoveTowards(
+            _currentVolumeWeight,
+            targetWeight,
+            volumeWeightSmoothSpeed * Time.deltaTime
+        );
+        guardImpactVolume.weight = _currentVolumeWeight;
     }
 
     /// <summary>

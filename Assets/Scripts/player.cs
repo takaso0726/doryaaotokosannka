@@ -55,6 +55,10 @@ public class test : MonoBehaviour
     public Enemy enemy;
     public Animator animator;
 
+    [Header("演出用")]
+    public FightingCameraController fightingCamera; // 仁王立ち被弾時のローアングル演出カメラ
+    private int GuardComboCount = 0;               // 仁王立ちで連続して耐えた回数
+
     bool flag;
     
 
@@ -412,9 +416,19 @@ public class test : MonoBehaviour
                 Debug.Log("漢!!");
                 se.PlayOneShot(MenBlock_se);
                 HP -= enemy.atk / 2;
+
+                //連続で耐えた回数を加算し、カメラにローアングル演出を要求する
+                GuardComboCount++;
+                if (fightingCamera != null)
+                {
+                    fightingCamera.OnGuardImpact(transform, GuardComboCount);
+                }
             }
             else
             {
+                //ガードしていない被弾なので連続耐久はリセット
+                GuardComboCount = 0;
+
                 //ヒット時のアニメーション再生
                 animator.SetTrigger("Hit");
 
