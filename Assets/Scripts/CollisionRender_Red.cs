@@ -2,7 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class ColliderVisualizer : MonoBehaviour
+public class ColliderVisualizer_Red : MonoBehaviour
 {
     Dictionary<Collider, GameObject> dict = new Dictionary<Collider, GameObject>();
 
@@ -72,7 +72,7 @@ public class ColliderVisualizer : MonoBehaviour
 
             var material = primitive.GetComponent<Renderer>().material;
             material.shader = Shader.Find("Sprites/Default");
-            primitive.GetComponent<MeshRenderer>().material.color = new Color(0.3f, 0.8f, 0.3f, 0.15f);
+            primitive.GetComponent<MeshRenderer>().material.color = new Color(0.8f, 0.3f, 0.3f, 0.45f);
 
             this.dict.Add(collider, primitive);
         }
@@ -84,10 +84,7 @@ public class ColliderVisualizer : MonoBehaviour
         {
             Collider collider = kv.Key;
             GameObject primitive = kv.Value;
-
-
-            // コライダーが削除されていないか確認する
-            if (collider != null)
+            if(collider != null)
             {
                 if (collider is SphereCollider)
                 {
@@ -102,6 +99,7 @@ public class ColliderVisualizer : MonoBehaviour
                     UpdatePrimitive(primitive, collider as CapsuleCollider);
                 }
             }
+            
         }
     }
 }
