@@ -564,6 +564,10 @@ public class test : MonoBehaviour
         LeftFoot.enabled = true;       //右足
         LeftUpLeg.enabled = true;      //右太もも
         LeftLeg.enabled = true;        //右ふくらはぎ
+
+        //Gizmos.color = Color.red; // 赤色にする
+       // Gizmos.DrawWireCube(transform.position, transform.localScale);
+
         //操作用変数をリセット
         Control_I = 0;
     }
