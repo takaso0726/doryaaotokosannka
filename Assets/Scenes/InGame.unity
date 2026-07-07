@@ -926,6 +926,30 @@ MonoBehaviour:
   rotationSmoothTime: 0.2
   focusZoomDistance: 2
   focusLookAtHeightOffset: 1.2
+  guardImpactDistance: 3
+  guardImpactCamHeight: 0.4
+  guardImpactHorizontalAngle: -30
+  guardImpactFilmFromFront: 0
+  guardImpactLookAtHeight: 1.9
+  guardImpactMoveInSmoothTime: 0.08
+  guardImpactHoldDuration: 0.6
+  shakeBaseAmplitude: 0.1
+  shakeAmplitudePerCombo: 0.02
+  shakeMaxAmplitude: 0.4
+  shakeFrequency: 150
+  guardImpactVolume: {fileID: 832575518}
+  guardImpactVolumeWeight: 1
+  volumeWeightSmoothSpeed: 8
+  rebornCloseUpDistance: 0.8
+  rebornPullBackDistance: 4
+  rebornCloseUpHeight: 1.4
+  rebornCloseUpAngle: 15
+  rebornZoomSmoothTime: 0.35
+  rebornMaxLevel: 3
+  rebornOrbitDuration: 0.45
+  rebornOrbitRadius: 3.5
+  rebornOrbitHeight: 1.8
+  rebornRoarLookAtHeight: 1.6
 --- !u!1 &343912591
 GameObject:
   m_ObjectHideFlags: 0
@@ -2247,6 +2271,7 @@ MonoBehaviour:
   Hit_particle: {fileID: 3132062550767402246, guid: a48a9f201806121499896f3e561bf1c4, type: 3}
   enemy: {fileID: 1593231832}
   animator: {fileID: 0}
+  fightingCamera: {fileID: 330585548}
 --- !u!54 &956537539
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -3413,6 +3438,7 @@ MonoBehaviour:
   Hit_particle: {fileID: 3132062550767402246, guid: a48a9f201806121499896f3e561bf1c4, type: 3}
   enemy: {fileID: 0}
   animator: {fileID: 0}
+  fightingCamera: {fileID: 0}
 --- !u!4 &1202966597 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 3ee547485a232eb408aeca940bb7724b, type: 3}
@@ -4160,6 +4186,7 @@ MonoBehaviour:
   Hit_particle: {fileID: 3132062550767402246, guid: a48a9f201806121499896f3e561bf1c4, type: 3}
   enemy: {fileID: 0}
   animator: {fileID: 0}
+  fightingCamera: {fileID: 0}
 --- !u!1 &1491263583
 GameObject:
   m_ObjectHideFlags: 0

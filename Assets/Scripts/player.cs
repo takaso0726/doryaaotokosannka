@@ -58,6 +58,7 @@ public class test : MonoBehaviour
     [Header("演出用")]
     public FightingCameraController fightingCamera; // 仁王立ち被弾時のローアングル演出カメラ
     private int GuardComboCount = 0;               // 仁王立ちで連続して耐えた回数
+    private bool _rebornCamStarted = false;        // 根性復活のクローズアップカメラを開始済みか
 
     bool flag;
     
@@ -475,16 +476,33 @@ public class test : MonoBehaviour
         mng.SettestStatus(test.Status.Reborn);
         Debug.Log(RebornTimer);
 
+        //ダウンした瞬間、一度だけ顔・拳へのクローズアップカメラを開始する
+        if (!_rebornCamStarted && fightingCamera != null)
+        {
+            fightingCamera.StartRebornCloseUp(transform);
+            _rebornCamStarted = true;
+        }
+
+        int mashThreshold = 11 + (3 * RebornCnt);
+
         if (RebornTimer < 5.0f)
         {
             //連打回数が15回か
-            if (MenCnt <= 11 + ( 3 * (RebornCnt)))
+            if (MenCnt <= mashThreshold)
             {
                 //エンターキーで連打
                 if (Gamepad.current.bButton.wasPressedThisFrame)
                 {
                     //カウントを加算
                     ++MenCnt;
+                }
+
+                //連打の進捗に応じて復活レベルを算出し、カメラを徐々に引かせる
+                if (fightingCamera != null && mashThreshold > 0)
+                {
+                    float progress = (float)MenCnt / mashThreshold;
+                    int level = Mathf.Clamp(Mathf.FloorToInt(progress * fightingCamera.rebornMaxLevel), 0, fightingCamera.rebornMaxLevel);
+                    fightingCamera.SetRebornLevel(level);
                 }
             }
             else
@@ -496,12 +514,27 @@ public class test : MonoBehaviour
                 MenCnt = 0;
                 RebornTimer = 0.0f;
                 Controlflag = true;
+
+                //根性復活成功！咆哮して立ち上がる漢を中心に、カメラが180度高速で回り込む
+                if (fightingCamera != null)
+                {
+                    fightingCamera.SetRebornLevel(fightingCamera.rebornMaxLevel);
+                    fightingCamera.TriggerRebornStandUpOrbit(transform);
+                }
+                _rebornCamStarted = false; //次回のダウンに備えてリセット
             }
         }
         else
         {
             //マネージャーに「死亡状態」を設定する
             mng.SettestStatus(test.Status.Dead);
+
+            //復活できず力尽きた場合はクローズアップ演出を終了しておく
+            if (fightingCamera != null)
+            {
+                fightingCamera.ClearReborn();
+            }
+            _rebornCamStarted = false;
         }
         Debug.Log(MenCnt);
     }

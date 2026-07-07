@@ -93,6 +93,38 @@ public class FightingCameraController : MonoBehaviour
     [Tooltip("Volumeの重みが切り替わる速さ")]
     public float volumeWeightSmoothSpeed = 8f;
 
+    [Header("根性復活演出（リバースカム：クローズアップ〜引き）")]
+    [Tooltip("ダウン直後、顔や拳へ寄る最短距離")]
+    public float rebornCloseUpDistance = 0.8f;
+
+    [Tooltip("復活レベルが最大まで上がったときの距離（ここまで徐々に引く）")]
+    public float rebornPullBackDistance = 4.0f;
+
+    [Tooltip("クローズアップする高さ（顔・拳あたり）")]
+    public float rebornCloseUpHeight = 1.4f;
+
+    [Tooltip("正面から見た角度のズレ（度）。真正面すぎない見せ方にする")]
+    public float rebornCloseUpAngle = 15f;
+
+    [Tooltip("復活レベル(0〜rebornMaxLevel)に応じて距離が変化する際のスムーズさ")]
+    public float rebornZoomSmoothTime = 0.35f;
+
+    [Tooltip("復活演出の最大レベル（このレベルで最も引いた画になる）")]
+    public int rebornMaxLevel = 3;
+
+    [Header("根性復活演出（立ち上がり180度バレットタイム）")]
+    [Tooltip("180度回り込むのにかかる時間。短いほど高速でキレのある回り込みになる")]
+    public float rebornOrbitDuration = 0.45f;
+
+    [Tooltip("回り込み時にキャラを中心にとる半径")]
+    public float rebornOrbitRadius = 3.5f;
+
+    [Tooltip("回り込み時のカメラの高さ")]
+    public float rebornOrbitHeight = 1.8f;
+
+    [Tooltip("咆哮するキャラクターのどのあたりを見るか（高さ）")]
+    public float rebornRoarLookAtHeight = 1.6f;
+
     // 内部状態
     private Vector3 _velocityPos;   // SmoothDamp用
     private float _velocityZoom;    // SmoothDamp用（float）
@@ -112,6 +144,17 @@ public class FightingCameraController : MonoBehaviour
     private Vector3 _guardImpactVelocityPos;
     private float _currentVolumeWeight = 0f;
 
+    // 根性復活演出（リバースカム）関連
+    private bool _isRebornCloseUpMode = false;
+    private bool _isRebornOrbitMode = false;
+    private Transform _rebornTarget;
+    private int _rebornLevel = 0;
+    private float _rebornCurrentDistance;
+    private float _rebornVelocityZoom;
+    private Vector3 _rebornVelocityPos;
+    private float _rebornOrbitTimer;
+    private float _rebornOrbitStartAngle;
+
     void Start()
     {
         _currentDistance = (maxZoomDistance + minZoomDistance) * 0.5f;
@@ -127,6 +170,20 @@ public class FightingCameraController : MonoBehaviour
         if (_isGuardImpactMode)
         {
             UpdateGuardImpactCamera();
+            return;
+        }
+
+        // 根性復活：立ち上がった瞬間の180度バレットタイム回り込み
+        if (_isRebornOrbitMode)
+        {
+            UpdateRebornOrbitCamera();
+            return;
+        }
+
+        // 根性復活：ダウン中の連打演出（顔・拳クローズアップ〜引き）
+        if (_isRebornCloseUpMode)
+        {
+            UpdateRebornCloseUpCamera();
             return;
         }
 
@@ -368,6 +425,135 @@ public class FightingCameraController : MonoBehaviour
             volumeWeightSmoothSpeed * Time.deltaTime
         );
         guardImpactVolume.weight = _currentVolumeWeight;
+    }
+
+    /// <summary>
+    /// HPが0になり「根性復活システム」が発動した瞬間に呼び出す。
+    /// ダウンしたキャラの顔・拳への超クローズアップを開始する。
+    /// </summary>
+    public void StartRebornCloseUp(Transform target)
+    {
+        if (target == null) return;
+
+        _isRebornCloseUpMode = true;
+        _isRebornOrbitMode = false;
+        _rebornTarget = target;
+        _rebornLevel = 0;
+        _rebornCurrentDistance = rebornCloseUpDistance;
+    }
+
+    /// <summary>
+    /// 連打の進捗（復活レベル）を更新する。0〜rebornMaxLevelの範囲で渡すこと。
+    /// レベルが上がるほどカメラが自動的に引いていく。
+    /// </summary>
+    public void SetRebornLevel(int level)
+    {
+        _rebornLevel = Mathf.Clamp(level, 0, rebornMaxLevel);
+    }
+
+    /// <summary>
+    /// 根性復活が成功し、キャラが立ち上がった瞬間に呼び出す。
+    /// 咆哮するキャラクターを中心に、現在のカメラ位置から180度高速で回り込む。
+    /// </summary>
+    public void TriggerRebornStandUpOrbit(Transform target)
+    {
+        if (target == null) return;
+
+        _isRebornCloseUpMode = false;
+        _isRebornOrbitMode = true;
+        _rebornTarget = target;
+        _rebornOrbitTimer = 0f;
+
+        // 現在のカメラ位置を基準にした角度からスタートすることで、クローズアップから違和感なく繋がる
+        Vector3 toCam = transform.position - target.position;
+        toCam.y = 0f;
+        _rebornOrbitStartAngle = Mathf.Atan2(toCam.x, toCam.z) * Mathf.Rad2Deg;
+    }
+
+    /// <summary>
+    /// 根性復活演出を強制終了し、通常の追従モードへ戻す
+    /// （復活失敗で死亡した場合や、シーン遷移前のリセット等に使用）
+    /// </summary>
+    public void ClearReborn()
+    {
+        _isRebornCloseUpMode = false;
+        _isRebornOrbitMode = false;
+        _rebornTarget = null;
+        _rebornLevel = 0;
+    }
+
+    /// <summary>
+    /// 連打中のクローズアップ〜引き画の毎フレーム更新処理
+    /// </summary>
+    private void UpdateRebornCloseUpCamera()
+    {
+        if (_rebornTarget == null)
+        {
+            ClearReborn();
+            return;
+        }
+
+        // レベルに応じて、クローズアップ〜引きの距離を補間
+        float t = rebornMaxLevel > 0 ? (float)_rebornLevel / rebornMaxLevel : 0f;
+        float targetDistance = Mathf.Lerp(rebornCloseUpDistance, rebornPullBackDistance, t);
+
+        _rebornCurrentDistance = Mathf.SmoothDamp(
+            _rebornCurrentDistance,
+            targetDistance,
+            ref _rebornVelocityZoom,
+            rebornZoomSmoothTime
+        );
+
+        // 真正面すぎない角度から、顔・拳あたりへ寄る
+        Vector3 dir = Quaternion.AngleAxis(rebornCloseUpAngle, Vector3.up) * _rebornTarget.forward;
+        Vector3 desiredPos = _rebornTarget.position + dir.normalized * _rebornCurrentDistance;
+        desiredPos.y = _rebornTarget.position.y + rebornCloseUpHeight;
+
+        transform.position = Vector3.SmoothDamp(
+            transform.position,
+            desiredPos,
+            ref _rebornVelocityPos,
+            rebornZoomSmoothTime
+        );
+
+        Vector3 lookAtTarget = _rebornTarget.position + Vector3.up * rebornCloseUpHeight;
+        transform.LookAt(lookAtTarget);
+        _smoothedLookAt = lookAtTarget;
+    }
+
+    /// <summary>
+    /// 立ち上がった瞬間の180度バレットタイム回り込みの毎フレーム更新処理
+    /// </summary>
+    private void UpdateRebornOrbitCamera()
+    {
+        if (_rebornTarget == null)
+        {
+            ClearReborn();
+            return;
+        }
+
+        _rebornOrbitTimer += Time.deltaTime;
+        float t = Mathf.Clamp01(_rebornOrbitTimer / rebornOrbitDuration);
+
+        // イーズアウトで勢いよく回り込み、終盤でスッと止まる（バレットタイム感）
+        float eased = 1f - Mathf.Pow(1f - t, 3f);
+        float angle = _rebornOrbitStartAngle + 180f * eased;
+        float rad = angle * Mathf.Deg2Rad;
+
+        Vector3 orbitOffset = new Vector3(Mathf.Sin(rad), 0f, Mathf.Cos(rad)) * rebornOrbitRadius;
+        Vector3 pos = _rebornTarget.position + orbitOffset;
+        pos.y = _rebornTarget.position.y + rebornOrbitHeight;
+
+        transform.position = pos;
+
+        Vector3 lookAtTarget = _rebornTarget.position + Vector3.up * rebornRoarLookAtHeight;
+        transform.LookAt(lookAtTarget);
+        _smoothedLookAt = lookAtTarget;
+
+        if (t >= 1f)
+        {
+            ClearReborn();
+        }
     }
 
     /// <summary>
