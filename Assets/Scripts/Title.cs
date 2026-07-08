@@ -2,7 +2,6 @@ using UnityEngine;
 using UnityEngine.InputSystem; 
 using UnityEngine.SceneManagement;
 
-
 public class Title : MonoBehaviour
 {
     //変数宣言
@@ -20,27 +19,34 @@ public class Title : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        //キー入力でインゲームに移行
-        if(Gamepad.current.aButton.wasPressedThisFrame)
-        {
-
-            //効果音再生
-            se.PlayOneShot(Titlese);
-            flag = true;
-        }
-        if(flag)
+        if (flag)
         {
             //経過時間を加える
             CntTimer += Time.deltaTime;
             //経過時間がgameOverTIme以上になったら
             if (CntTimer >= 0.7f)
             {
-                //ゲームオーバーシーンを読み込む
+                //インゲームシーンを読み込む
                 SceneManager.LoadScene("InGame");
 
             }
         }
-        
+    }
 
+    // 三回押されたとき遷移する
+    public void OnTextThriceClicked()
+    {
+        // シーンの遷移をする
+        TriggerSceneTransition();
+    }
+
+    // シーン遷移を開始する共通の処理
+    private void TriggerSceneTransition()
+    {
+        if (!flag) // まだ遷移が始まっていなければ
+        {
+            se.PlayOneShot(Titlese); // 効果音を鳴らす
+            flag = true;             // 遷移開始フラグをONにする（これでUpdate内のタイマーが動き出す）
+        }
     }
 }
