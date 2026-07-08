@@ -202,7 +202,7 @@ public class Enemy : MonoBehaviour
         //タイマー加算
         ActionTimer += Time.deltaTime;
 
-        if (ActionTimer >= 1.0f && HP > 10)
+        if (ActionTimer >= 1.0f)
         {
             AtkHitboxOFF();
             Menflag = false;
@@ -236,7 +236,9 @@ public class Enemy : MonoBehaviour
             DoAction(action);
         }
 
-        //タックル
+
+        /*
+        //タックル--封印--
         if(HP <= 10)
         {
             if ((Mathf.Sqrt((transform.position.z - Player.transform.position.z) * (transform.position.z - Player.transform.position.z))) < 3.0f && Enemy_Status == Status.Neutral)
@@ -269,8 +271,12 @@ public class Enemy : MonoBehaviour
                 AtkHitboxOFF();
             }
         }
+
+
+        */
     }
 
+       
     // 距離とプレイヤーの状態から、次に取る行動を重み付き抽選で決める
     private ActionType ChooseAction(float distance, bool playerIsAttacking)
     {

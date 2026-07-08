@@ -19,6 +19,9 @@ public class GameMNG : MonoBehaviour
     float PTimer;
     int PCnt;
 
+    AudioSource BGM_Lv1;
+    public AudioClip BGM;
+
     //ゲームオーバーに移行するまでの時間
     public float gameOverTime;
     //プレイヤーが倒されてからの経過時間
@@ -53,6 +56,14 @@ public class GameMNG : MonoBehaviour
 
         playerChangeTimer = 0.0f;
         playerStatus = test.Status.Live;
+
+        //効果音再生用のAudioClipを取得
+        BGM_Lv1 = GetComponent<AudioSource>();
+
+        BGM_Lv1.loop = true;
+
+        //BGM再生
+        BGM_Lv1.Play();
     }
 
     // Update is called once per frame

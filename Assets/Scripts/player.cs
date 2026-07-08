@@ -1,4 +1,5 @@
-﻿using System.Security.Cryptography.X509Certificates;
+﻿using NUnit.Framework;
+using System.Security.Cryptography.X509Certificates;
 using Unity.VisualScripting;
 using UnityEditor;
 using UnityEngine;
@@ -14,7 +15,6 @@ public class test : MonoBehaviour
     bool Controlflag;
     bool Menflag;
     public int atk;                 //攻撃力
-    int AttackCnt;
 
     Rigidbody rb;                 //Rigidbody型の変数
     public Vector3 force;
@@ -93,7 +93,6 @@ public class test : MonoBehaviour
         atk = 10;
         RebornCnt = 1;
         Control_I = 0;
-        AttackCnt = 0;
 
        
 
@@ -160,7 +159,7 @@ public class test : MonoBehaviour
                     Controlflag = true;
                 }
                 Menflag = false;
-                AttackCnt = 0;
+                
                 //攻撃の当たり判定をリセットし次の攻撃が当たるように
                 hasHit = false;
 
@@ -327,14 +326,13 @@ public class test : MonoBehaviour
             {
                 case 0:
                     //待機
-                    AttackCnt = 0;
+               
                     break;
 
                 case 1:
                     //前に移動
                     Movefront();
                     break;
-
                 case 2:
                     //後ろに移動
                     Moveback();
@@ -348,7 +346,6 @@ public class test : MonoBehaviour
 
                 case 4:
                     //弱攻撃(パンチ)
-                    //0.5秒遅延してから実行
                     Attack_punch();
                     break;
 
@@ -542,7 +539,7 @@ public class test : MonoBehaviour
     void Movefront()//前移動
     {
         //プレイヤーを前(右)に移動させる
-        transform.Translate(0.0f, 0.0f, moveSpeed);
+        transform.Translate(0.0f, 0.0f, moveSpeed * Time.deltaTime);
         //操作用変数をリセット
         Control_I = 0;
     }
@@ -550,7 +547,7 @@ public class test : MonoBehaviour
     void Moveback()//後ろ移動
     {
         //プレイヤーを後ろ(左)に移動させる
-        transform.Translate(0.0f, 0.0f, -moveSpeed);
+        transform.Translate(0.0f, 0.0f, -moveSpeed * Time.deltaTime);
         //操作用変数をリセット
         Control_I = 0;
     }
@@ -612,8 +609,6 @@ public class test : MonoBehaviour
         LeftUpLeg.enabled = true;      //右太もも
         LeftLeg.enabled = true;        //右ふくらはぎ
 
-        //Gizmos.color = Color.red; // 赤色にする
-       // Gizmos.DrawWireCube(transform.position, transform.localScale);
 
         //操作用変数をリセット
         Control_I = 0;
@@ -674,7 +669,7 @@ public class test : MonoBehaviour
         Controlflag = false;
         //トリガーをリセット
         animator.ResetTrigger("DownKick");
-
+        //アニメーション再生
         animator.SetTrigger("DownKick");
         AttackTimer = -0.5f;
         Control_I = 0;
