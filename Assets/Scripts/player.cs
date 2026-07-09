@@ -1,3 +1,5 @@
+using NUnit.Framework.Constraints;
+using UnityEditor.Rendering.LookDev;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -50,7 +52,22 @@ public class test : MonoBehaviour
         KnockedDown,// ダウン中（根性復活チャレンジ中）
         Dead,       // 死亡（復活失敗）
     }
+    //=====================================================
+    // ★タグや名前
+    //=====================================================
+    public string PlayerName = "player";
+    //=====================================================
+    // ★初期向き設定
+    //=====================================================
+    public enum FacingDirection
+    {
+        Forward,    // +Z方向を向く
+        Back,       // -Z方向を向く
+    }
 
+    [Header("初期向き設定")]
+    [Tooltip("ゲーム開始時にモデルが向く方向。対戦相手と向き合うように設定してください。")]
+    [SerializeField] FacingDirection initialFacing = FacingDirection.Forward;
     //=====================================================
     // ★移動・向き
     //=====================================================
@@ -120,6 +137,7 @@ public class test : MonoBehaviour
     //=====================================================
     [Header("参照")]
     public Enemy enemy;                              // 対戦相手（敵）
+
     public Animator animator;                         // プレイヤーのAnimator
     public FightingCameraController fightingCamera;   // 演出用カメラ
 
@@ -199,6 +217,9 @@ public class test : MonoBehaviour
         atk = 10;
         currentState = PlayerState.Idle;
         Player_status = Status.Live;
+        // Inspectorで指定された初期向きを反映する
+        Vector3 initialDirection = (initialFacing == FacingDirection.Forward) ? Vector3.forward : Vector3.back;
+        transform.rotation = Quaternion.LookRotation(initialDirection, Vector3.up);
     }
 
     // 指定した名前の子オブジェクトからCapsuleColliderを取得するヘルパー
@@ -610,7 +631,7 @@ public class test : MonoBehaviour
     void OnTriggerEnter(Collider collision)
     {
         //当たった対象物の[tag]がEAttack (エネミーによる攻撃)だった場合のみ処理する
-        if (!collision.gameObject.CompareTag("EAttack") || HP <= 0) return;
+        if (!collision.gameObject.CompareTag("PAttack") || !collision.gameObject.CompareTag("EAttack") || HP <= 0) return;
 
         if (isGuarding)
         {
@@ -637,12 +658,12 @@ public class test : MonoBehaviour
             hitParticle.Play();
             Destroy(hitParticle.gameObject, 1.0f);
 
-            HP -= enemy.atk;
+            HP -= atk;
         }
 
         GameMNG mng = GameObject.Find("ManagerObject").GetComponent<GameMNG>();
         mng.Player_ReduceHP(HP);
-        enemy.atk = 10;   // 敵の攻撃力を初期値に戻す（一度使ったらリセット）
+        atk = 10;   // 敵の攻撃力を初期値に戻す（一度使ったらリセット）
 
         if (HP < 0) HP = 0;
     }
@@ -672,5 +693,8 @@ public class test : MonoBehaviour
         // ★元コードのまま維持。"Enemy_ReduceHP"という名前だが実際にはプレイヤー自身のHPを渡している。
         //   GameMNG側の実装次第では意図通りかもしれないが、要確認。
         mng.Enemy_ReduceHP(HP);
+        //現在のHPの表示
+        Debug.Log(HP);
+        Debug.Log(PlayerName);
     }
 }

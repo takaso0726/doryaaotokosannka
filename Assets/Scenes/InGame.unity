@@ -799,7 +799,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CameraController
   targets:
-  - {fileID: 0}
+  - {fileID: 648027778}
   - {fileID: 1593231836}
   followSmoothTime: 0.25
   baseOffset: {x: 10, y: 3, z: 0}
@@ -1369,7 +1369,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: 29dd0fc02d04a7447b40e484821a9f0d, type: 3}
       propertyPath: m_Name
-      value: Player (1)
+      value: Player
       objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: 29dd0fc02d04a7447b40e484821a9f0d, type: 3}
       propertyPath: m_Layer
@@ -2130,18 +2130,40 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::test
   moveSpeed: 5
-  Jumpflag: 0
-  atk: 10
-  force: {x: 0, y: 300, z: 0}
-  HP: 0
-  MenBlock_se: {fileID: 8300000, guid: 007e2ac24e3c0ff4d9128441104ce2dc, type: 3}
-  Player_status: 0
   turnSpeed: 15
+  moveInputThreshold: 0.03
+  crouchInputThreshold: -0.43
+  upKickInputThreshold: 0.25
+  force: {x: 0, y: 300, z: 0}
+  Jumpflag: 0
+  HP: 0
+  atk: 10
+  Player_status: 0
+  punchDuration: 0.5
+  kickDuration: 0.6
+  upKickDuration: 0.7
+  downKickDuration: 0.5
+  guardDuration: 0.5
+  throwDuration: 1.5
+  rebornTimeLimit: 5
+  rebornHp: 30
+  mashThresholdBase: 11
+  mashThresholdStep: 3
+  standHeight: 2
+  standCenter: {x: 0, y: 1, z: 0}
+  crouchHeight: 0.65
+  crouchCenter: {x: 0, y: 0.5, z: 0}
+  MenBlock_se: {fileID: 8300000, guid: 007e2ac24e3c0ff4d9128441104ce2dc, type: 3}
   Men_particle: {fileID: 8049100662646873597, guid: eb3bdfa2eb6b25c4693f8900c7cf4ed7, type: 3}
   Hit_particle: {fileID: 3132062550767402246, guid: a48a9f201806121499896f3e561bf1c4, type: 3}
   enemy: {fileID: 0}
   animator: {fileID: 0}
   fightingCamera: {fileID: 0}
+--- !u!4 &648027778 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 29dd0fc02d04a7447b40e484821a9f0d, type: 3}
+  m_PrefabInstance: {fileID: 486434307}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &652997322
 GameObject:
   m_ObjectHideFlags: 0
@@ -2332,7 +2354,7 @@ MonoBehaviour:
   E_HPbar: {fileID: 939642776}
   BGM: {fileID: 8300000, guid: 78215c0163ae6f14e9dbae9023719665, type: 3}
   gameOverTime: 2
-  PlayerTransform: {fileID: 0}
+  PlayerTransform: {fileID: 648027778}
   EnemyTransform: {fileID: 1593231836}
   cameraController: {fileID: 330585548}
 --- !u!4 &750834239
@@ -4177,13 +4199,30 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::test
   moveSpeed: 0.015
-  Jumpflag: 0
-  atk: 0
-  force: {x: 0, y: 300, z: 0}
-  HP: 0
-  MenBlock_se: {fileID: 8300000, guid: 007e2ac24e3c0ff4d9128441104ce2dc, type: 3}
-  Player_status: 0
   turnSpeed: 15
+  moveInputThreshold: 0.03
+  crouchInputThreshold: -0.43
+  upKickInputThreshold: 0.25
+  force: {x: 0, y: 300, z: 0}
+  Jumpflag: 0
+  HP: 0
+  atk: 0
+  Player_status: 0
+  punchDuration: 0.5
+  kickDuration: 0.6
+  upKickDuration: 0.7
+  downKickDuration: 0.5
+  guardDuration: 0.5
+  throwDuration: 1.5
+  rebornTimeLimit: 5
+  rebornHp: 30
+  mashThresholdBase: 11
+  mashThresholdStep: 3
+  standHeight: 2
+  standCenter: {x: 0, y: 1, z: 0}
+  crouchHeight: 0.65
+  crouchCenter: {x: 0, y: 0.5, z: 0}
+  MenBlock_se: {fileID: 8300000, guid: 007e2ac24e3c0ff4d9128441104ce2dc, type: 3}
   Men_particle: {fileID: 8049100662646873597, guid: eb3bdfa2eb6b25c4693f8900c7cf4ed7, type: 3}
   Hit_particle: {fileID: 3132062550767402246, guid: a48a9f201806121499896f3e561bf1c4, type: 3}
   enemy: {fileID: 0}
@@ -4864,13 +4903,30 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::test
   moveSpeed: 0.015
-  Jumpflag: 0
-  atk: 0
-  force: {x: 0, y: 300, z: 0}
-  HP: 0
-  MenBlock_se: {fileID: 8300000, guid: 007e2ac24e3c0ff4d9128441104ce2dc, type: 3}
-  Player_status: 0
   turnSpeed: 15
+  moveInputThreshold: 0.03
+  crouchInputThreshold: -0.43
+  upKickInputThreshold: 0.25
+  force: {x: 0, y: 300, z: 0}
+  Jumpflag: 0
+  HP: 0
+  atk: 0
+  Player_status: 0
+  punchDuration: 0.5
+  kickDuration: 0.6
+  upKickDuration: 0.7
+  downKickDuration: 0.5
+  guardDuration: 0.5
+  throwDuration: 1.5
+  rebornTimeLimit: 5
+  rebornHp: 30
+  mashThresholdBase: 11
+  mashThresholdStep: 3
+  standHeight: 2
+  standCenter: {x: 0, y: 1, z: 0}
+  crouchHeight: 0.65
+  crouchCenter: {x: 0, y: 0.5, z: 0}
+  MenBlock_se: {fileID: 8300000, guid: 007e2ac24e3c0ff4d9128441104ce2dc, type: 3}
   Men_particle: {fileID: 8049100662646873597, guid: eb3bdfa2eb6b25c4693f8900c7cf4ed7, type: 3}
   Hit_particle: {fileID: 3132062550767402246, guid: a48a9f201806121499896f3e561bf1c4, type: 3}
   enemy: {fileID: 0}
