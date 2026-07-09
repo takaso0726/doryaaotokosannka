@@ -29,7 +29,7 @@ public class Title : MonoBehaviour
             if (CntTimer >= 0.7f)
             {
                 //インゲームシーンを読み込む
-                SceneManager.LoadScene("InGame");
+                SceneManager.LoadScene("StageSelect");
 
             }
         }

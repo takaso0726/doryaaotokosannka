@@ -708,7 +708,6 @@ public class test : MonoBehaviour
 
     }
 
-
     void AtkHitboxOFF()
     {
         //全ての攻撃用当たり判定をOFF
@@ -736,6 +735,4 @@ public class test : MonoBehaviour
         GameMNG mng = GameObject.Find("ManagerObject").GetComponent<GameMNG>();
         mng.Enemy_ReduceHP(HP);
     }
-
-
 }
