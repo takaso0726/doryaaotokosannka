@@ -1,10 +1,12 @@
-using UnityEngine;
+ï»¿using UnityEngine;
 using UnityEngine.InputSystem; 
 using UnityEngine.SceneManagement;
 
+//ã‚¿ã‚¤ãƒˆãƒ«ã®ãƒ—ãƒ­ã‚°ãƒ©ãƒ 
+
 public class Title : MonoBehaviour
 {
-    //•Ï”éŒ¾
+    //å¤‰æ•°å®£è¨€
     AudioSource se;
     public AudioClip Titlese;
     float CntTimer;
@@ -12,7 +14,7 @@ public class Title : MonoBehaviour
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
-        //Œø‰Ê‰¹Ä¶—p‚ÌAudioClip‚ğæ“¾
+        //åŠ¹æœéŸ³å†ç”Ÿç”¨ã®AudioClipã‚’å–å¾—
         se = GetComponent<AudioSource>();
     }
 
@@ -21,32 +23,32 @@ public class Title : MonoBehaviour
     {
         if (flag)
         {
-            //Œo‰ßŠÔ‚ğ‰Á‚¦‚é
+            //çµŒéæ™‚é–“ã‚’åŠ ãˆã‚‹
             CntTimer += Time.deltaTime;
-            //Œo‰ßŠÔ‚ªgameOverTImeˆÈã‚É‚È‚Á‚½‚ç
+            //çµŒéæ™‚é–“ãŒgameOverTImeä»¥ä¸Šã«ãªã£ãŸã‚‰
             if (CntTimer >= 0.7f)
             {
-                //ƒCƒ“ƒQ[ƒ€ƒV[ƒ“‚ğ“Ç‚İ‚Ş
+                //ã‚¤ãƒ³ã‚²ãƒ¼ãƒ ã‚·ãƒ¼ãƒ³ã‚’èª­ã¿è¾¼ã‚€
                 SceneManager.LoadScene("InGame");
 
             }
         }
     }
 
-    // O‰ñ‰Ÿ‚³‚ê‚½‚Æ‚«‘JˆÚ‚·‚é
+    // ä¸‰å›æŠ¼ã•ã‚ŒãŸã¨ãé·ç§»ã™ã‚‹
     public void OnTextThriceClicked()
     {
-        // ƒV[ƒ“‚Ì‘JˆÚ‚ğ‚·‚é
+        // ã‚·ãƒ¼ãƒ³ã®é·ç§»ã‚’ã™ã‚‹
         TriggerSceneTransition();
     }
 
-    // ƒV[ƒ“‘JˆÚ‚ğŠJn‚·‚é‹¤’Ê‚Ìˆ—
+    // ã‚·ãƒ¼ãƒ³é·ç§»ã‚’é–‹å§‹ã™ã‚‹å…±é€šã®å‡¦ç†
     private void TriggerSceneTransition()
     {
-        if (!flag) // ‚Ü‚¾‘JˆÚ‚ªn‚Ü‚Á‚Ä‚¢‚È‚¯‚ê‚Î
+        if (!flag) // ã¾ã é·ç§»ãŒå§‹ã¾ã£ã¦ã„ãªã‘ã‚Œã°
         {
-            se.PlayOneShot(Titlese); // Œø‰Ê‰¹‚ğ–Â‚ç‚·
-            flag = true;             // ‘JˆÚŠJnƒtƒ‰ƒO‚ğON‚É‚·‚éi‚±‚ê‚ÅUpdate“à‚Ìƒ^ƒCƒ}[‚ª“®‚«o‚·j
+            se.PlayOneShot(Titlese); // åŠ¹æœéŸ³ã‚’é³´ã‚‰ã™
+            flag = true;             // é·ç§»é–‹å§‹ãƒ•ãƒ©ã‚°ã‚’ONã«ã™ã‚‹ï¼ˆã“ã‚Œã§Updateå†…ã®ã‚¿ã‚¤ãƒãƒ¼ãŒå‹•ãå‡ºã™ï¼‰
         }
     }
 }
