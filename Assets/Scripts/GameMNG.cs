@@ -37,6 +37,7 @@ public class GameMNG : MonoBehaviour
     //シーン中のカメラコントローラー
     public FightingCameraController cameraController;
 
+
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
