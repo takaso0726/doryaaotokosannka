@@ -1,41 +1,28 @@
-﻿using NUnit.Framework;
-using System.Security.Cryptography.X509Certificates;
-using Unity.VisualScripting;
-using UnityEditor;
 using UnityEngine;
 using UnityEngine.InputSystem;
-using UnityEngine.UIElements;
-using static UnityEngine.ParticleSystem;
 
+//=====================================================
+// ★このスクリプトはPlayerInputコンポーネントとセットで使用します。
+//   PlayerInputの Behavior は「Send Messages」に設定してください。
+//   Actions には PlayerControls.inputactions（Playerマップ）を割り当ててください。
+//   誰の入力かはPlayerInputManagerがデバイス単位で自動的に振り分けます。
+//=====================================================
+// プレイヤーキャラクターの移動・攻撃・被弾・復活などの一連の挙動を管理するメインスクリプト
+//
+// 【設計方針（旧版からの変更点）】
+// ・行動の切り替えは PlayerState enum + switch 的な if/else で一元管理し、
+//   数値(Control_I)による分岐をやめて可読性を上げている。
+// ・各行動の「拘束時間」は stateTimer 1本にまとめ、必ず Time.deltaTime で
+//   カウントダウンする（秒とフレームが混在するバグを解消）。
+// ・入力コールバック(OnPunch等)は「ボタンが押された」という意図フラグを
+//   立てるだけにし、実際にどの行動へ遷移するかの判断は Update 内の
+//   HandleFreeInput() に集約する。
+// ・攻撃時間やしゃがみ判定のしきい値は [SerializeField] にして
+//   Inspectorから調整できるようにしている。
+[RequireComponent(typeof(PlayerInput))]
 public class test : MonoBehaviour
 {
-    //変数宣言
-    public float moveSpeed;
-    public bool Jumpflag;
-    bool Controlflag;
-    bool Menflag;
-    public int atk;                 //攻撃力
-
-    Rigidbody rb;                 //Rigidbody型の変数
-    public Vector3 force;
-
-    float AttackTimer;
-    public int HP;
-    int RebornCnt;                 //復活回数のカウント
-
-    int Control_I;                  //操作の入力から分岐するための変数
-
-    bool hasHit = false; // 攻撃の判定用の変数
-    //効果音用
-    AudioSource se;
-    public AudioClip MenBlock_se;
-
-    public test.Status Player_status;
-
-    float RebornTimer = 0.0f;
-    int MenCnt = 0;
-
-    //プレイヤーの状態
+    // 外部（GameMNG等）に見せるおおまかな状態。既存の呼び出し互換のため維持
     public enum Status
     {
         Neutral,    //待機(ニュートラル)
@@ -48,540 +35,393 @@ public class test : MonoBehaviour
         Win,        //勝利
     };
 
+    // 内部の行動制御用ステート。今どの行動をしているかをこれ1つで管理する
+    private enum PlayerState
+    {
+        Idle,       // 待機
+        Move,       // 前後移動
+        Crouch,     // しゃがみ
+        Punch,      // パンチ（空中では飛び蹴りになる）
+        Kick,       // 通常キック
+        UpKick,     // 上キック
+        DownKick,   // 下キック
+        Guard,      // 仁王立ち
+        Throw,      // 投げ
+        KnockedDown,// ダウン中（根性復活チャレンジ中）
+        Dead,       // 死亡（復活失敗）
+    }
 
-    public ParticleSystem Men_particle;     //仁王立ち用のパーティクル
-    public ParticleSystem Hit_particle;     //ヒット時用のパーティクル
+    //=====================================================
+    // ★移動・向き
+    //=====================================================
+    [Header("移動設定")]
+    public float moveSpeed = 3f;             // 移動速度
+    public float turnSpeed = 15f;            // 向きを変える速さ
+    [SerializeField] float moveInputThreshold = 0.03f;    // 左右移動と判定するスティックの入力量
+    [SerializeField] float crouchInputThreshold = -0.43f; // しゃがみ／下キックと判定するスティックの下入力量
+    [SerializeField] float upKickInputThreshold = 0.25f;  // 上キックと判定するスティックの上入力量
 
-    public Enemy enemy;
-    public Animator animator;
+    //=====================================================
+    // ★ジャンプ
+    //=====================================================
+    [Header("ジャンプ設定")]
+    public Vector3 force;                    // ジャンプ時にRigidbodyへ加える力
+    // true = 地上にいてジャンプ可能な状態／false = 空中にいる状態
+    // （名前は旧版から変えず互換性を保っているが、意味は「接地フラグ」に近い）
+    public bool Jumpflag = true;
 
-    [Header("演出用")]
-    public FightingCameraController fightingCamera; // 仁王立ち被弾時のローアングル演出カメラ
-    private int GuardComboCount = 0;               // 仁王立ちで連続して耐えた回数
-    private bool _rebornCamStarted = false;        // 根性復活のクローズアップカメラを開始済みか
+    //=====================================================
+    // ★体力・攻撃力・状態
+    //=====================================================
+    [Header("ステータス")]
+    public int HP = 100;                     // 体力
+    public int atk = 10;                     // 攻撃力
+    public test.Status Player_status;        // 外部から参照される、プレイヤーの現在の大まかな状態
 
-    bool flag;
-    
+    //=====================================================
+    // ★各アクションの持続時間（Inspectorで調整可能）
+    //=====================================================
+    [Header("アクション時間設定（秒）")]
+    [SerializeField] float punchDuration = 0.5f;    // パンチ（空中攻撃含む）の拘束時間
+    [SerializeField] float kickDuration = 0.6f;     // 通常キックの拘束時間
+    [SerializeField] float upKickDuration = 0.7f;   // 上キックの拘束時間
+    [SerializeField] float downKickDuration = 0.5f; // 下キックの拘束時間
+    [SerializeField] float guardDuration = 0.5f;    // 仁王立ちの拘束時間
+    [SerializeField] float throwDuration = 1.5f;    // 投げの拘束時間
 
+    //=====================================================
+    // ★根性復活（ダウン後の復活チャレンジ）設定
+    //=====================================================
+    [Header("復活（根性）設定")]
+    [SerializeField] float rebornTimeLimit = 5.0f;  // 復活チャレンジの制限時間
+    [SerializeField] int rebornHp = 30;             // 復活成功時に回復するHP
+    [SerializeField] int mashThresholdBase = 11;    // 必要連打数の基準値
+    [SerializeField] int mashThresholdStep = 3;     // 復活回数が増えるごとに必要連打数が増える量
 
+    //=====================================================
+    // ★しゃがみ時のコライダー変化量
+    //=====================================================
+    [Header("しゃがみ時のコライダー設定")]
+    [SerializeField] float standHeight = 2.0f;
+    [SerializeField] Vector3 standCenter = new Vector3(0, 1.0f, 0);
+    [SerializeField] float crouchHeight = 0.65f;
+    [SerializeField] Vector3 crouchCenter = new Vector3(0, 0.5f, 0);
+
+    //=====================================================
+    // ★エフェクト・効果音
+    //=====================================================
+    [Header("エフェクト・SE")]
+    public AudioClip MenBlock_se;            // 仁王立ちガード成功時の効果音
+    public ParticleSystem Men_particle;      // 仁王立ち用のパーティクル
+    public ParticleSystem Hit_particle;      // ヒット時用のパーティクル
+
+    //=====================================================
+    // ★外部参照
+    //=====================================================
+    [Header("参照")]
+    public Enemy enemy;                              // 対戦相手（敵）
+    public Animator animator;                         // プレイヤーのAnimator
+    public FightingCameraController fightingCamera;   // 演出用カメラ
+
+    //=====================================================
+    // ★内部状態
+    //=====================================================
+    private PlayerState currentState = PlayerState.Idle;   // 現在の行動状態
+    private float stateTimer;                               // 現在の行動が終わるまでの残り時間（秒）
+
+    Rigidbody rb;
+    AudioSource se;
+    PlayerInput playerInput;
+    Vector2 moveInput;                        // 左スティックの現在値（OnMoveで更新され続ける）
+
+    // ボタン入力の「意図」フラグ。OnXコールバックで立てて、Update内で1回だけ消費してクリアする
+    bool wantJump;
+    bool wantPunch;
+    bool wantKick;
+    bool wantGuard;
+    bool wantThrow;
+
+    bool isGuarding;                 // 仁王立ち中かどうか（被弾処理の分岐に使う）
+    int guardComboCount;             // 仁王立ちで連続して耐えた回数
+    bool rebornCamStarted;           // 根性復活のクローズアップカメラを開始済みか
+    bool canThrow = true;            // 投げの多重発生を防ぐフラグ
+
+    int rebornCount = 1;             // 復活回数のカウント
+    float rebornTimer;               // 復活チャレンジの経過時間
+    int mashCount;                   // 復活チャレンジ中のボタン連打回数
 
     //当たり判定の子オブジェクト
     CapsuleCollider Head;
-    CapsuleCollider RightArm;
-    CapsuleCollider RightForeArm;
-    CapsuleCollider RightHand;
-    CapsuleCollider RightFoot;
-    CapsuleCollider RightUpLeg;
-    CapsuleCollider RightLeg;
-    CapsuleCollider LeftArm;
-    CapsuleCollider LeftForeArm;
-    CapsuleCollider LeftHand;
-    CapsuleCollider LeftFoot;
-    CapsuleCollider LeftUpLeg;
-    CapsuleCollider LeftLeg;
-
-    CapsuleCollider Player_Collider;
+    CapsuleCollider RightArm, RightForeArm, RightHand, RightFoot, RightUpLeg, RightLeg;
+    CapsuleCollider LeftArm, LeftForeArm, LeftHand, LeftFoot, LeftUpLeg, LeftLeg;
+    CapsuleCollider Player_Collider;          // 本体（胴体）のコライダー。しゃがみ時にサイズ変更する
+    CapsuleCollider[] allHitboxes;            // 全ての攻撃用当たり判定をまとめて操作するための配列
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
+    // 各種コンポーネント・子オブジェクトの当たり判定の取得と初期化を行う
     void Start()
     {
-        Jumpflag = true;
-        Controlflag = true;
-        Menflag = false;
-        AttackTimer = 0.0f;
-        HP = 100;
-        atk = 10;
-        RebornCnt = 1;
-        Control_I = 0;
-
-       
+        // 自分にアタッチされているPlayerInputコンポーネントを取得
+        playerInput = GetComponent<PlayerInput>();
+        // どのプレイヤー番号・どのデバイスが紐づいているかログ出力（デバッグ用）
+        Debug.Log($"{gameObject.name} : PlayerIndex={playerInput.playerIndex} / Device={(playerInput.devices.Count > 0 ? playerInput.devices[0].displayName : "なし")}");
 
         rb = GetComponent<Rigidbody>();		//PlayerのRigidbodyを取得
-
         animator = GetComponent<Animator>();
-
-        //<当たり判定の子オブジェクトの取得>
-        //頭の当たり判定
-        Head = GameObject.Find("P-Head").gameObject.GetComponent<CapsuleCollider>();
-
-
-        //右腕の当たり判定
-        RightArm = GameObject.Find("P-RightArm").gameObject.GetComponent<CapsuleCollider>();
-        //右前腕の当たり判定
-        RightForeArm = GameObject.Find("P-RightForeArm").gameObject.GetComponent<CapsuleCollider>();
-        //右手の当たり判定
-        RightHand = GameObject.Find("P-RightHand").gameObject.GetComponent<CapsuleCollider>();
-
-        //右足の当たり判定
-        RightFoot = GameObject.Find("P-RightFoot").gameObject.GetComponent<CapsuleCollider>();
-        //右ふとももの当たり判定
-        RightUpLeg = GameObject.Find("P-RightUpLeg").gameObject.GetComponent<CapsuleCollider>();
-        //右ふくらはぎの当たり判定
-        RightLeg = GameObject.Find("P-RightLeg").gameObject.GetComponent<CapsuleCollider>();
-
-        //左腕の当たり判定
-        LeftArm = GameObject.Find("P-LeftArm").gameObject.GetComponent<CapsuleCollider>();
-        //左前腕の当たり判定
-        LeftForeArm = GameObject.Find("P-LeftForeArm").gameObject.GetComponent<CapsuleCollider>();
-        //左手の当たり判定
-        LeftHand = GameObject.Find("P-LeftHand").gameObject.GetComponent<CapsuleCollider>();
-
-        //左足の当たり判定
-        LeftFoot = GameObject.Find("P-LeftFoot").gameObject.GetComponent<CapsuleCollider>();
-        //左ふとももの当たり判定
-        LeftUpLeg = GameObject.Find("P-LeftUpLeg").gameObject.GetComponent<CapsuleCollider>();
-        //左ふくらはぎの当たり判定
-        LeftLeg = GameObject.Find("P-LeftLeg").gameObject.GetComponent<CapsuleCollider>();
-
-        Player_Collider = gameObject.GetComponent<CapsuleCollider>();
-
-        //効果音再生用のAudioClipを取得
         se = GetComponent<AudioSource>();
 
-        AtkHitboxOFF();
+        //<当たり判定の子オブジェクトの取得>
+        Head = FindHitbox("P-Head");
+        RightArm = FindHitbox("P-RightArm");
+        RightForeArm = FindHitbox("P-RightForeArm");
+        RightHand = FindHitbox("P-RightHand");
+        RightFoot = FindHitbox("P-RightFoot");
+        RightUpLeg = FindHitbox("P-RightUpLeg");
+        RightLeg = FindHitbox("P-RightLeg");
+        LeftArm = FindHitbox("P-LeftArm");
+        LeftForeArm = FindHitbox("P-LeftForeArm");
+        LeftHand = FindHitbox("P-LeftHand");
+        LeftFoot = FindHitbox("P-LeftFoot");
+        LeftUpLeg = FindHitbox("P-LeftUpLeg");
+        LeftLeg = FindHitbox("P-LeftLeg");
+        Player_Collider = GetComponent<CapsuleCollider>();
 
-        flag = true;
+        // 一括ON/OFF操作用の配列にまとめておく
+        allHitboxes = new[]
+        {
+            Head, RightArm, RightForeArm, RightHand, RightFoot, RightUpLeg, RightLeg,
+            LeftArm, LeftForeArm, LeftHand, LeftFoot, LeftUpLeg, LeftLeg,
+        };
+
+        DisableAllHitboxes();
+
+        HP = 100;
+        atk = 10;
+        currentState = PlayerState.Idle;
+        Player_status = Status.Live;
+    }
+
+    // 指定した名前の子オブジェクトからCapsuleColliderを取得するヘルパー
+    CapsuleCollider FindHitbox(string objectName)
+    {
+        return GameObject.Find(objectName).GetComponent<CapsuleCollider>();
+    }
+
+    //=====================================================
+    // ★Input Actionsのコールバック（PlayerInputのBehavior=Send Messagesで自動的に呼ばれる）
+    //   ここでは「ボタンが押された」という意図フラグを立てるだけにし、
+    //   実際にどう行動へ反映するかはUpdate側で判断する。
+    //=====================================================
+
+    // 左スティック：Move（継続的な値なので、押した/離したではなく現在値を保持するだけ）
+    public void OnMove(InputValue value)
+    {
+        moveInput = value.Get<Vector2>();
+    }
+
+    // ジャンプボタン押下時のコールバック
+    public void OnJump(InputValue value)
+    {
+        if (value.isPressed) wantJump = true;
+    }
+
+    // パンチボタン押下時のコールバック
+    // ※HP<=0のダウン中は「根性復活」の連打判定としてこのボタンを使う
+    public void OnPunch(InputValue value)
+    {
+        if (!value.isPressed) return;
+
+        if (HP <= 0)
+        {
+            // ダウン中は復活チャレンジの連打カウントとして加算するだけ
+            mashCount++;
+            return;
+        }
+
+        wantPunch = true;
+    }
+
+    // キックボタン押下時のコールバック（通常／上／下の分岐はUpdate側で行う）
+    public void OnKick(InputValue value)
+    {
+        if (value.isPressed) wantKick = true;
+    }
+
+    // 仁王立ちボタン押下時のコールバック
+    public void OnStand(InputValue value)
+    {
+        if (value.isPressed) wantGuard = true;
+    }
+
+    // 投げボタン押下時のコールバック
+    public void OnThrow(InputValue value)
+    {
+        if (value.isPressed) wantThrow = true;
     }
 
     // Update is called once per frame
+    // 毎フレームの更新処理。HPが尽きていれば復活チャレンジへ、
+    // そうでなければ現在の状態に応じて「拘束中のタイマー消化」か「新しい行動の受付」を行う。
     void Update()
     {
-        if (HP > 0)
+        if (HP <= 0)
         {
-            if (AttackTimer <= 0.0f)
-            {
-                AttackTimer += Time.deltaTime;
-            }
-            else
-            {
-                if(!Controlflag)
-                {
-                    Controlflag = true;
-                }
-                Menflag = false;
-                
-                //攻撃の当たり判定をリセットし次の攻撃が当たるように
-                hasHit = false;
-
-                //攻撃用の当たり判定を非Activeにする
-                AtkHitboxOFF();
-                flag = true;
-            }
-        }
-        else//HPが0か
-        {
-            //復活チャレンジに移行
-            RebornCh(RebornCnt);
+            HandleKnockedDown();
+            ClearInputIntents();
+            return;
         }
 
-        //<入力チェック>
-        if (HP > 0)
+        bool isFree = currentState == PlayerState.Idle
+                   || currentState == PlayerState.Move
+                   || currentState == PlayerState.Crouch;
+
+        if (isFree)
         {
-            //右移動(前)
-            if (Gamepad.current != null)
-            {
-                if //(Keyboard.current.dKey.wasPressedThisFrame && Controlflag)
-                (Gamepad.current.leftStick.value.x >= 0.03 && Controlflag)
-                {
-                    //操作用変数に代入
-                    Control_I = 1;
-                    //操作可能フラグをOFF
-                    //Controlflag = false;
-                }
-                //左移動(後ろ)
-                if //(Keyboard.current.aKey.wasPressedThisFrame && Controlflag)
-                (Gamepad.current.leftStick.value.x <= -0.03 && Controlflag)
-                {
-                    //操作用変数に代入
-                    Control_I = 2;
-                    //操作可能フラグをOFF
-                    //Controlflag = false;
-
-                }
-                //ジャンプ
-                if //(Keyboard.current.wKey.wasPressedThisFrame && Controlflag && Jumpflag)
-                (Gamepad.current.xButton.wasPressedThisFrame && (Jumpflag && Controlflag))
-                {
-                    //デバックログの表示
-                    Debug.Log("ジャンプ");
-                    //操作用変数に代入
-                    Control_I = 3;
-                    //操作可能フラグをOFF
-                    Controlflag = false;
-                }
-                //しゃがみ
-                /*if (Gamepad.current.leftStick.value.y <= -0.43 && Controlflag)
-                //(Keyboard.current.sKey.wasPressedThisFrame && Controlflag && Jumpflag)
-                {
-                    //操作用変数に代入
-                    Control_I = 10;
-                }
-                else if (Gamepad.current.leftStick.value.y >= 0.0 && Controlflag)
-                {
-                    Control_I = 0;
-                    animator.SetBool("Crouch", false);
-
-                    //当たり判定を上げる
-                    Player_Collider.height = 2.0f;
-                    Player_Collider.center = new Vector3(0, 1.0f, 0);
-
-                }
-                */
-                bool isCrouching = Gamepad.current.leftStick.value.y <= -0.43f;
-
-                if (isCrouching && Controlflag)
-                {
-                    Control_I = 10;
-                }
-                else
-                {
-                    // しゃがみ解除の見た目処理だけ行い、Control_Iは触らない
-                    if (animator.GetBool("Crouch"))
-                    {
-                        animator.SetBool("Crouch", false);
-                        Player_Collider.height = 2.0f;
-                        Player_Collider.center = new Vector3(0, 1.0f, 0);
-                    }
-                }
-
-                //パンチ
-                if //(Keyboard.current.qKey.wasPressedThisFrame && Controlflag)
-                ((Gamepad.current.bButton.wasPressedThisFrame) && Controlflag)
-                {
-                    //デバックログの表示
-                    Debug.Log("パンチ");
-
-                    // 予約をすべてクリア
-                    animator.ResetTrigger("Punch");
-                    animator.ResetTrigger("Flying-kick");
-                    animator.ResetTrigger("Kick");
-                    animator.ResetTrigger("Jump");
-                    //操作用変数に代入
-                    Control_I = 4;
-                    //操作可能フラグをOFF
-                    Controlflag = false;
-
-                }
-                //キック
-                if  //(Keyboard.current.zKey.wasPressedThisFrame && Controlflag)
-                   (Gamepad.current.aButton.wasPressedThisFrame && Controlflag)
-                {
-                    // 予約をすべてクリア
-                    animator.ResetTrigger("Punch");
-                    animator.ResetTrigger("Flying-kick");
-                    animator.ResetTrigger("Kick");
-                    animator.ResetTrigger("Jump");
-
-                    if//(Keyboard.current.wKey.wasPressedThisFrame)
-                        (Gamepad.current.leftStick.value.y < -0.43f)
-                    {
-                        //デバックログの表示
-                        Debug.Log("下キック");
-                        Control_I = 8;
-                    }
-                    else if//(Keyboard.current.sKey.wasPressedThisFrame)
-                        (Gamepad.current.leftStick.value.y > 0.25f)
-                    {
-                        //デバックログの表示
-                        Debug.Log("上キック");
-
-                        Control_I = 9;
-                    }
-                    else
-                    {
-                        //デバックログの表示
-                        Debug.Log("キック");
-
-                        //操作用変数に代入
-                        Control_I = 5;
-                    }
-
-                    //操作可能フラグをOFF
-                    Controlflag = false;
-                }
-                //仁王立ち
-                if //(Keyboard.current.eKey.wasPressedThisFrame && Controlflag)
-                (Gamepad.current.yButton.wasPressedThisFrame && Controlflag)
-                {
-                    //デバックログの表示
-                    Debug.Log("仁王立ち");
-                    //操作用変数に代入
-                    Control_I = 6;
-                    Controlflag = false;
-                }
-                //投げ
-                if//(Keyboard.current.xKey.wasPressedThisFrame && Controlflag)
-                (Gamepad.current.rightShoulder.wasPressedThisFrame && Controlflag)
-                {
-                    //デバックログの表示
-                    Debug.Log("掴み");
-
-                    //操作用変数に代入
-                    Control_I = 7;
-                    Controlflag = false;
-                }
-            }
-
-            switch (Control_I)
-            {
-                case 0:
-                    //待機
-               
-                    break;
-
-                case 1:
-                    //前に移動
-                    Movefront();
-                    break;
-                case 2:
-                    //後ろに移動
-                    Moveback();
-                    break;
-
-                case 3:
-                    //ジャンプ
-                    Jumpflag = false;
-                    Movejump();
-                    break;
-
-                case 4:
-                    //弱攻撃(パンチ)
-                    Attack_punch();
-                    break;
-
-                case 5:
-                    //強攻撃(キック)
-                    Attack_kick();
-                    break;
-
-                case 6:
-                    //仁王立ち
-                    Standing();
-                    break;
-
-                case 7:
-                    //投げ
-                    //□秒遅延してから実行
-                    Throwing();
-                    break;
-
-                case 8:
-                    //下キック
-                    //遅延無し実行
-                    DonwnKick();
-                    break;
-
-                case 9:
-                    //下キック
-                    //遅延0.4秒で実行　
-                    UpKick();
-                    break;
-
-                case 10:
-                    //しゃがみ
-                    //遅延無し実行
-                    Crouch();
-                    break;
-            }
-        }
-    }
-
-    void OnCollisionEnter(Collision other)
-    {
-        if (other.gameObject.CompareTag("Ground"))
-        {
-            //ジャンプフラグをあげる
-            Jumpflag = true;
-        }
-    }
-
-    private void OnTriggerEnter(Collider collision)
-    {
-        //当たった対象物の[tag]がEAttack (エネミーによる攻撃)だった場合は処理する
-        if (collision.gameObject.CompareTag("EAttack") && HP > 0)
-        {
-
-            // 攻撃は一回だけ判定
-            hasHit = true;
-
-            //体力を表示
-            Debug.Log("プレイヤーのHP : " + HP);
-
-            if (Menflag)
-            {
-                //攻撃力を追加
-                atk += enemy.atk;
-                Debug.Log("漢!!");
-                se.PlayOneShot(MenBlock_se);
-                HP -= enemy.atk / 2;
-
-                //連続で耐えた回数を加算し、カメラにローアングル演出を要求する
-                GuardComboCount++;
-                if (fightingCamera != null)
-                {
-                    fightingCamera.OnGuardImpact(transform, GuardComboCount);
-                }
-            }
-            else
-            {
-                //ガードしていない被弾なので連続耐久はリセット
-                GuardComboCount = 0;
-
-                //ヒット時のアニメーション再生
-                animator.SetTrigger("Hit");
-
-
-                //衝突位置を取得
-                Vector3 HitPoint = collision.ClosestPoint(collision.transform.position);
-
-                // パーティクルシステムのインスタンスを生成する。
-                ParticleSystem HitParticle = Instantiate(Hit_particle, HitPoint,Quaternion.Euler(-90.0f, 0.0f, 0.0f));
-
-                // パーティクルを発生させる。
-                HitParticle.Play();
-                // ※第一引数をHitParticleだけにするとコンポーネントしか削除されない。
-                Destroy(HitParticle.gameObject, 1.0f);
-
-                //HPを減らす
-                HP -= enemy.atk;
-                //ノックバック
-                //transform.Translate(0.0f, 0.0f, -0.65f);
-            }
-            //UI表示
-            GameMNG mng = GameObject.Find("ManagerObject").GetComponent<GameMNG>();
-            mng.Player_ReduceHP(HP);
-            enemy.atk = 10;
-
-            // HPが0以下にならないように調整
-            if (HP < 0)
-            {
-                HP = 0;
-            }
-        }
-    }
-
-    //復活チャレンジ
-    void RebornCh(int RebornCnt)
-    {
-        GameMNG mng = GameObject.Find("ManagerObject").GetComponent<GameMNG>();
-        mng.PlayerUI(RebornTimer, MenCnt);
-        //時間を加算
-        RebornTimer += Time.deltaTime;
-        //コントロールフラグをさげる
-        Controlflag = false;
-        //マネージャーに「復活状態」を設定する
-        mng.SettestStatus(test.Status.Reborn);
-        Debug.Log(RebornTimer);
-
-        //ダウンした瞬間、一度だけ顔・拳へのクローズアップカメラを開始する
-        if (!_rebornCamStarted && fightingCamera != null)
-        {
-            fightingCamera.StartRebornCloseUp(transform);
-            _rebornCamStarted = true;
-        }
-
-        int mashThreshold = 11 + (3 * RebornCnt);
-
-        if (RebornTimer < 5.0f)
-        {
-            //連打回数が15回か
-            if (MenCnt <= mashThreshold)
-            {
-                //エンターキーで連打
-                if (Gamepad.current.bButton.wasPressedThisFrame)
-                {
-                    //カウントを加算
-                    ++MenCnt;
-                }
-
-                //連打の進捗に応じて復活レベルを算出し、カメラを徐々に引かせる
-                if (fightingCamera != null && mashThreshold > 0)
-                {
-                    float progress = (float)MenCnt / mashThreshold;
-                    int level = Mathf.Clamp(Mathf.FloorToInt(progress * fightingCamera.rebornMaxLevel), 0, fightingCamera.rebornMaxLevel);
-                    fightingCamera.SetRebornLevel(level);
-                }
-            }
-            else
-            {
-                //復活
-                HP = 30;
-                //復活カウントを加算
-                ++RebornCnt;
-                MenCnt = 0;
-                RebornTimer = 0.0f;
-                Controlflag = true;
-
-                //根性復活成功！咆哮して立ち上がる漢を中心に、カメラが180度高速で回り込む
-                if (fightingCamera != null)
-                {
-                    fightingCamera.SetRebornLevel(fightingCamera.rebornMaxLevel);
-                    fightingCamera.TriggerRebornStandUpOrbit(transform);
-                }
-                _rebornCamStarted = false; //次回のダウンに備えてリセット
-            }
+            HandleFreeInput();
         }
         else
         {
-            //マネージャーに「死亡状態」を設定する
-            mng.SettestStatus(test.Status.Dead);
-
-            //復活できず力尽きた場合はクローズアップ演出を終了しておく
-            if (fightingCamera != null)
-            {
-                fightingCamera.ClearReborn();
-            }
-            _rebornCamStarted = false;
+            // 攻撃・ガード・投げなど拘束時間のある行動中はタイマーだけを進める
+            TickBusyState();
         }
-        Debug.Log(MenCnt);
+
+        ClearInputIntents();
     }
 
-    void Movefront()//前移動
+    // 1フレームで消費しなかった意図フラグを毎フレーム末尾でクリアする
+    void ClearInputIntents()
     {
-        //プレイヤーを前(右)に移動させる
-        transform.Translate(0.0f, 0.0f, moveSpeed * Time.deltaTime);
-        //操作用変数をリセット
-        Control_I = 0;
+        wantJump = false;
+        wantPunch = false;
+        wantKick = false;
+        wantGuard = false;
+        wantThrow = false;
     }
 
-    void Moveback()//後ろ移動
+    //-----------------------------------------------------
+    // 拘束のない状態（Idle/Move/Crouch）での入力処理
+    //-----------------------------------------------------
+    // 優先度：ジャンプ ＞ 投げ ＞ パンチ ＞ キック ＞ 仁王立ち ＞ 移動
+    void HandleFreeInput()
     {
-        //プレイヤーを後ろ(左)に移動させる
-        transform.Translate(0.0f, 0.0f, -moveSpeed * Time.deltaTime);
-        //操作用変数をリセット
-        Control_I = 0;
+        bool isCrouchInput = moveInput.y <= crouchInputThreshold;
+
+        // --- しゃがみの見た目切り替え（アナログ値なので毎フレーム判定）---
+        if (isCrouchInput && currentState != PlayerState.Crouch)
+        {
+            EnterCrouch();
+        }
+        else if (!isCrouchInput && currentState == PlayerState.Crouch)
+        {
+            ExitCrouch();
+        }
+
+        // --- アクションボタン ---
+        if (wantJump && Jumpflag)
+        {
+            DoJump();
+            return;
+        }
+        if (wantThrow)
+        {
+            EnterThrow();
+            return;
+        }
+        if (wantPunch)
+        {
+            EnterPunch();
+            return;
+        }
+        if (wantKick)
+        {
+            EnterKick(isCrouchInput);
+            return;
+        }
+        if (wantGuard)
+        {
+            EnterGuard();
+            return;
+        }
+
+        // --- 移動（ボタン入力が無い時、かつしゃがみ入力でない時のみ）---
+        if (!isCrouchInput)
+        {
+            if (moveInput.x >= moveInputThreshold)
+            {
+                Move(Vector3.forward);
+            }
+            else if (moveInput.x <= -moveInputThreshold)
+            {
+                Move(Vector3.back);
+            }
+            else if (currentState == PlayerState.Move)
+            {
+                currentState = PlayerState.Idle;
+            }
+        }
     }
 
-    void Movejump()
+    // プレイヤーを指定方向へ移動させ、その方向を向かせる
+    void Move(Vector3 worldDirection)
     {
-        //ジャンプ
+        currentState = PlayerState.Move;
+        // ※Space.Worldを指定し、向きが変わっても常に世界座標の指定方向へ移動するようにする
+        transform.Translate(worldDirection * moveSpeed * Time.deltaTime, Space.World);
+        FaceDirection(worldDirection);
+    }
+
+    // 指定した世界座標方向へプレイヤーの向きを滑らかに回転させる
+    void FaceDirection(Vector3 worldDirection)
+    {
+        if (worldDirection.sqrMagnitude < 0.0001f) return;
+
+        Quaternion targetRotation = Quaternion.LookRotation(worldDirection, Vector3.up);
+        transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, turnSpeed * Time.deltaTime);
+    }
+
+    // しゃがみ開始処理。コライダーを低くし、しゃがみアニメーションを再生する
+    void EnterCrouch()
+    {
+        currentState = PlayerState.Crouch;
+        Player_Collider.height = crouchHeight;
+        Player_Collider.center = crouchCenter;
+        animator.SetBool("Crouch", true);
+    }
+
+    // しゃがみ終了処理。コライダーを立ち姿勢に戻す
+    void ExitCrouch()
+    {
+        Player_Collider.height = standHeight;
+        Player_Collider.center = standCenter;
+        animator.SetBool("Crouch", false);
+        currentState = PlayerState.Idle;
+    }
+
+    // ジャンプ処理。アニメーション再生とRigidbodyへの力の付与を行う
+    void DoJump()
+    {
         animator.SetTrigger("Jump");
-        //プレイヤーをジャンプさせる(Forceを使う)
         rb.AddForce(force);
-        //操作用変数をリセット
-        Control_I = 0;
-        //フラグ 
-        Jumpflag = false;
+        Jumpflag = false; // 空中に出たので再度ジャンプできないようにする
     }
 
-    void Attack_punch()
+    //-----------------------------------------------------
+    // 拘束のある状態（攻撃・ガード・投げ）への遷移
+    //-----------------------------------------------------
+
+    // パンチ（弱攻撃）処理。地上か空中かでアニメーションと当たり判定を切り替える
+    void EnterPunch()
     {
-        Controlflag = false;
-        Control_I = 0;
+        ResetAttackTriggers();
+        currentState = PlayerState.Punch;
+        stateTimer = punchDuration;
 
-        // 連打防止のためトリガーをリセット
-        animator.ResetTrigger("Punch");
-        animator.ResetTrigger("Flying-kick");
-
-        //タイマーをリセット
-        AttackTimer = -0.5f;
-        if(Jumpflag)
+        if (Jumpflag)
         {
             //弱攻撃(パンチ)
             animator.SetTrigger("Punch");
-            //攻撃箇所の当たり判定をActiveにする
-            LeftHand.enabled = true;        //左手
-            RightHand.enabled = true;       //右手
+            LeftHand.enabled = true;
+            RightHand.enabled = true;
         }
         else
         {
@@ -590,152 +430,247 @@ public class test : MonoBehaviour
             LeftFoot.enabled = true;
             LeftLeg.enabled = true;
             RightFoot.enabled = true;
-        }   
-    }
-
-    void Attack_kick()
-    {
-        //コントロールフラグをOFF
-        Controlflag = false;
-        //トリガーをリセット
-        animator.ResetTrigger("Kick");
-
-        //強攻撃(キック)
-        animator.SetTrigger("Kick");
-        //タイマーをリセット
-        AttackTimer = -0.6f;
-        //攻撃用の当たり判定をON
-        LeftFoot.enabled = true;       //右足
-        LeftUpLeg.enabled = true;      //右太もも
-        LeftLeg.enabled = true;        //右ふくらはぎ
-
-
-        //操作用変数をリセット
-        Control_I = 0;
-    }
-
-    void Standing()
-    {
-        Controlflag = false;
-        //仁王立ち
-        AttackTimer = -0.5f;
-        Menflag = true;
-        Debug.Log("仁王立ち");
-
-        // パーティクルシステムのインスタンスを生成する。
-        ParticleSystem newParticle = Instantiate(Men_particle, new Vector3(transform.position.x, transform.position.y + 1.0f, transform.position.z),
-            Quaternion.Euler(-90.0f, 0.0f, 0.0f));
-
-        // パーティクルを発生させる。
-        newParticle.Play();
-        // ※第一引数をnewParticleだけにするとコンポーネントしか削除されない。
-        Destroy(newParticle.gameObject, 1.0f);
-
-        //操作用変数をリセット
-        Control_I = 0;
-    }
-
-    void Throwing()
-    {
-        Controlflag = false;
-        //トリガーをリセット
-        animator.ResetTrigger("Throw-start");
-
-        //投げアニメーション再生
-        animator.SetTrigger("Throw-start");
-        AttackTimer = -1.5f;
-
-        // 掴む時の距離
-        float distanceZ = Mathf.Abs(enemy.transform.position.z - transform.position.z);
-
-        //操作用変数をリセット
-        Control_I = 0;
-
-        //投げれるか距離でチェック(距離と相手の状態で判断したい)
-        if (enemy.Enemy_Status != Enemy.Status.Attack && (enemy.transform.position.z - transform.position.z < 1.75f) && flag)
-        {
-            Debug.Log("投げ成功");
-            enemy.transform.Translate(0.0f, 0.0f, -0.0025f);
-            enemy.animator.SetTrigger("Thrown");
-            enemy.damege(5);
-            flag = false;
         }
     }
 
-    //下キック
-    void DonwnKick()
+    // キック処理。スティックの上下入力で通常／上／下キックに分岐する
+    void EnterKick(bool isCrouchInput)
     {
-        //上書き防止のため固定
-        Controlflag = false;
-        //トリガーをリセット
-        animator.ResetTrigger("DownKick");
-        //アニメーション再生
-        animator.SetTrigger("DownKick");
-        AttackTimer = -0.5f;
-        Control_I = 0;
-        //当たり判定ON
-        RightFoot.enabled = true;
-        RightLeg.enabled = true;
+        ResetAttackTriggers();
+
+        if (isCrouchInput)
+        {
+            currentState = PlayerState.DownKick;
+            stateTimer = downKickDuration;
+            animator.SetTrigger("DownKick");
+            RightFoot.enabled = true;
+            RightLeg.enabled = true;
+        }
+        else if (moveInput.y > upKickInputThreshold)
+        {
+            currentState = PlayerState.UpKick;
+            stateTimer = upKickDuration;
+            animator.SetTrigger("UpKick");
+            RightFoot.enabled = true;
+            RightLeg.enabled = true;
+        }
+        else
+        {
+            currentState = PlayerState.Kick;
+            stateTimer = kickDuration;
+            animator.SetTrigger("Kick");
+            LeftFoot.enabled = true;
+            LeftUpLeg.enabled = true;
+            LeftLeg.enabled = true;
+        }
     }
 
-    //上キック
-    void UpKick()
+    // 仁王立ち（ガード）処理。ガードフラグを立て、演出用パーティクルを再生する
+    void EnterGuard()
     {
-        //上書き防止のため固定
-        Controlflag = false;
-        //トリガーをリセット
-        animator.ResetTrigger("UpKick");
+        currentState = PlayerState.Guard;
+        stateTimer = guardDuration;
+        isGuarding = true;
 
-        animator.SetTrigger("UpKick");
-        AttackTimer = -0.7f;
-        Control_I = 0;
-
-        //当たり判定ON
-        RightFoot.enabled = true;
-        RightLeg.enabled = true;
+        ParticleSystem newParticle = Instantiate(
+            Men_particle,
+            transform.position + Vector3.up,
+            Quaternion.Euler(-90f, 0f, 0f));
+        newParticle.Play();
+        Destroy(newParticle.gameObject, 1.0f);
     }
 
-    //しゃがみ
-    void Crouch()
+    // 投げ（掴み）処理。敵との距離・状態を判定し、条件を満たせば投げを成立させる
+    void EnterThrow()
     {
-      
-        //当たり判定を下げる
-        Player_Collider.height = 0.65f;
-        Player_Collider.center = new Vector3(0, 0.5f, 0);
+        currentState = PlayerState.Throw;
+        stateTimer = throwDuration;
+        animator.SetTrigger("Throw-start");
 
-        //アニメーション再生
-        animator.SetBool("Crouch", true);
+        bool inThrowRange = enemy.Enemy_Status != Enemy.Status.Attack
+            && (enemy.transform.position.z - transform.position.z < 1.75f)
+            && canThrow;
 
+        if (inThrowRange)
+        {
+            Debug.Log("投げ成功");
+            enemy.transform.Translate(0f, 0f, -0.0025f);   // 敵を少し引き寄せる
+            enemy.animator.SetTrigger("Thrown");             // 敵に投げられアニメーションを再生させる
+            enemy.damege(5);                                  // 敵に固定ダメージ5を与える
+            canThrow = false;                                 // 一度成功したら再度投げが発動しないようにする
+        }
     }
 
-
-    void AtkHitboxOFF()
+    // 攻撃系トリガーの予約をすべてクリアする（前の攻撃予約が残って誤発火するのを防ぐ）
+    void ResetAttackTriggers()
     {
-        //全ての攻撃用当たり判定をOFF
-        LeftHand.enabled = false;
-        LeftForeArm.enabled = false;
-        LeftArm.enabled = false;
-        Head.enabled = false;
-        RightArm.enabled = false;
-        RightForeArm.enabled = false;
-        RightHand.enabled = false;
-        RightFoot.enabled = false;
-        RightUpLeg.enabled = false;
-        RightLeg.enabled = false;
-        LeftArm.enabled = false;
-        LeftForeArm.enabled = false;
-        LeftHand.enabled = false;
-        LeftFoot.enabled = false;
-        LeftUpLeg.enabled = false;
-        LeftLeg.enabled = false;
+        animator.ResetTrigger("Punch");
+        animator.ResetTrigger("Flying-kick");
+        animator.ResetTrigger("Kick");
+        animator.ResetTrigger("Jump");
     }
 
+    // 拘束中の行動（攻撃・ガード・投げ）のタイマーを進め、時間切れになったらIdleへ戻す
+    void TickBusyState()
+    {
+        stateTimer -= Time.deltaTime;
+        if (stateTimer > 0f) return;
+
+        DisableAllHitboxes();
+        isGuarding = false;
+        canThrow = true;
+        currentState = PlayerState.Idle;
+    }
+
+    //-----------------------------------------------------
+    // 復活チャレンジ（ダウン中の処理）
+    //-----------------------------------------------------
+    // HPが0になった際に毎フレーム呼ばれる、根性復活（ボタン連打による復活）の処理
+    void HandleKnockedDown()
+    {
+        currentState = PlayerState.KnockedDown;
+
+        GameMNG mng = GameObject.Find("ManagerObject").GetComponent<GameMNG>();
+        mng.PlayerUI(rebornTimer, mashCount);
+
+        rebornTimer += Time.deltaTime;
+        Player_status = Status.Reborn;
+        mng.SettestStatus(Status.Reborn);
+
+        //ダウンした瞬間、一度だけ顔・拳へのクローズアップカメラを開始する
+        if (!rebornCamStarted && fightingCamera != null)
+        {
+            fightingCamera.StartRebornCloseUp(transform);
+            rebornCamStarted = true;
+        }
+
+        // 復活に必要な連打回数のしきい値（復活回数が増えるほど厳しくなる）
+        int mashThreshold = mashThresholdBase + mashThresholdStep * rebornCount;
+
+        if (rebornTimer < rebornTimeLimit)
+        {
+            if (mashCount <= mashThreshold)
+            {
+                //連打の進捗に応じて復活レベルを算出し、カメラを徐々に引かせる
+                if (fightingCamera != null && mashThreshold > 0)
+                {
+                    float progress = (float)mashCount / mashThreshold;
+                    int level = Mathf.Clamp(Mathf.FloorToInt(progress * fightingCamera.rebornMaxLevel), 0, fightingCamera.rebornMaxLevel);
+                    fightingCamera.SetRebornLevel(level);
+                }
+            }
+            else
+            {
+                //復活成功
+                HP = rebornHp;
+                rebornCount++;
+                mashCount = 0;
+                rebornTimer = 0f;
+                currentState = PlayerState.Idle;
+                Player_status = Status.Live;
+
+                //根性復活成功！咆哮して立ち上がる漢を中心に、カメラが180度高速で回り込む
+                if (fightingCamera != null)
+                {
+                    fightingCamera.SetRebornLevel(fightingCamera.rebornMaxLevel);
+                    fightingCamera.TriggerRebornStandUpOrbit(transform);
+                }
+                rebornCamStarted = false; //次回のダウンに備えてリセット
+            }
+        }
+        else
+        {
+            //制限時間内に復活できず力尽きた
+            currentState = PlayerState.Dead;
+            Player_status = Status.Dead;
+            mng.SettestStatus(Status.Dead);
+
+            if (fightingCamera != null)
+            {
+                fightingCamera.ClearReborn();
+            }
+            rebornCamStarted = false;
+        }
+    }
+
+    //-----------------------------------------------------
+    // 衝突・トリガー
+    //-----------------------------------------------------
+
+    // 物理的な衝突が発生した時に呼ばれる。地面との接触判定（着地）に使用
+    void OnCollisionEnter(Collision other)
+    {
+        if (other.gameObject.CompareTag("Ground"))
+        {
+            Jumpflag = true;
+        }
+    }
+
+    // トリガー判定の当たり判定に何かが接触した時に呼ばれる。敵の攻撃を受けた時の処理を行う
+    void OnTriggerEnter(Collider collision)
+    {
+        //当たった対象物の[tag]がEAttack (エネミーによる攻撃)だった場合のみ処理する
+        if (!collision.gameObject.CompareTag("EAttack") || HP <= 0) return;
+
+        if (isGuarding)
+        {
+            // 仁王立ち（ガード）中に被弾した場合の処理
+            atk += enemy.atk;                  // ガード成功で自分の攻撃力に敵の攻撃力を上乗せする
+            Debug.Log("漢!!");
+            se.PlayOneShot(MenBlock_se);       // ガード成功の効果音を再生
+            HP -= enemy.atk / 2;                // ガード中はダメージを半減させる
+
+            guardComboCount++;
+            if (fightingCamera != null)
+            {
+                fightingCamera.OnGuardImpact(transform, guardComboCount);
+            }
+        }
+        else
+        {
+            // ガードしていない状態で被弾した場合の処理
+            guardComboCount = 0;
+            animator.SetTrigger("Hit");
+
+            Vector3 hitPoint = collision.ClosestPoint(collision.transform.position);
+            ParticleSystem hitParticle = Instantiate(Hit_particle, hitPoint, Quaternion.Euler(-90f, 0f, 0f));
+            hitParticle.Play();
+            Destroy(hitParticle.gameObject, 1.0f);
+
+            HP -= enemy.atk;
+        }
+
+        GameMNG mng = GameObject.Find("ManagerObject").GetComponent<GameMNG>();
+        mng.Player_ReduceHP(HP);
+        enemy.atk = 10;   // 敵の攻撃力を初期値に戻す（一度使ったらリセット）
+
+        if (HP < 0) HP = 0;
+    }
+
+    //-----------------------------------------------------
+    // 当たり判定ユーティリティ
+    //-----------------------------------------------------
+
+    // 全身の攻撃用当たり判定コライダーを一括でOFFにする
+    void DisableAllHitboxes()
+    {
+        foreach (var hitbox in allHitboxes)
+        {
+            hitbox.enabled = false;
+        }
+    }
+
+    //-----------------------------------------------------
+    // 外部から呼ばれるダメージ処理
+    //-----------------------------------------------------
+    // 外部（敵など）から呼び出される、プレイヤーがダメージを受けるための公開メソッド
+    // n: 受けるダメージ量
     public void damege(int n)
     {
         HP -= n;
         GameMNG mng = GameObject.Find("ManagerObject").GetComponent<GameMNG>();
+        // ★元コードのまま維持。"Enemy_ReduceHP"という名前だが実際にはプレイヤー自身のHPを渡している。
+        //   GameMNG側の実装次第では意図通りかもしれないが、要確認。
         mng.Enemy_ReduceHP(HP);
     }
-
-
 }
