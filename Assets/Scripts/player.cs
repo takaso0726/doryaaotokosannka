@@ -35,6 +35,18 @@ public class test : MonoBehaviour
     float RebornTimer = 0.0f;
     int MenCnt = 0;
 
+    [Header("漢気ゲージ")]
+    //現在の漢気ゲージ(0～200%、100%で1ストック)
+    public float KankiGauge = 0f;
+    //ゲージの最大値(2ストック分)
+    public float MaxKankiGauge = 200f;
+    //必殺技の発動に必要なゲージ量(1ストック分)
+    public float KankiGaugeCost = 100f;
+    //仁王立ちで一度耐えるごとの増加量
+    public float KankiGainOnGuard = 20f;
+    //必殺技用アニメーショントリガー名
+    public string HissatsuTriggerName = "Hissatsu";
+
     //プレイヤーの状態
     public enum Status
     {
@@ -320,6 +332,17 @@ public class test : MonoBehaviour
                     Control_I = 7;
                     Controlflag = false;
                 }
+
+                //必殺技(漢気ゲージを1ストック消費して発動)
+                if (Gamepad.current.leftShoulder.wasPressedThisFrame && Controlflag && KankiGauge >= KankiGaugeCost)
+                {
+                    //デバックログの表示
+                    Debug.Log("必殺技");
+
+                    //操作用変数に代入
+                    Control_I = 11;
+                    Controlflag = false;
+                }
             }
 
             switch (Control_I)
@@ -382,6 +405,11 @@ public class test : MonoBehaviour
                     //遅延無し実行
                     Crouch();
                     break;
+
+                case 11:
+                    //必殺技
+                    Attack_Hissatsu();
+                    break;
             }
         }
     }
@@ -421,6 +449,9 @@ public class test : MonoBehaviour
                 {
                     fightingCamera.OnGuardImpact(transform, GuardComboCount);
                 }
+
+                //漢気ゲージを増加(最大値でクランプ)
+                KankiGauge = Mathf.Min(KankiGauge + KankiGainOnGuard, MaxKankiGauge);
             }
             else
             {
@@ -450,6 +481,8 @@ public class test : MonoBehaviour
             //UI表示
             GameMNG mng = GameObject.Find("ManagerObject").GetComponent<GameMNG>();
             mng.Player_ReduceHP(HP);
+            //漢気ゲージのUIも更新
+            mng.Player_SetKankiGauge(KankiGauge);
             enemy.atk = 10;
 
             // HPが0以下にならないように調整
@@ -612,6 +645,33 @@ public class test : MonoBehaviour
 
         //操作用変数をリセット
         Control_I = 0;
+    }
+
+    //必殺技(漢気ゲージ1ストック消費)
+    void Attack_Hissatsu()
+    {
+        Controlflag = false;
+        Control_I = 0;
+
+        //ゲージを1ストック(100%)消費
+        KankiGauge = Mathf.Max(0f, KankiGauge - KankiGaugeCost);
+
+        //UI更新
+        GameMNG mng = GameObject.Find("ManagerObject").GetComponent<GameMNG>();
+        mng.Player_SetKankiGauge(KankiGauge);
+
+        //連打防止のためトリガーをリセットしてから発動
+        animator.ResetTrigger(HissatsuTriggerName);
+        animator.SetTrigger(HissatsuTriggerName);
+
+        //タイマーをリセット(仮の硬直時間。演出尺に合わせて調整してください)
+        AttackTimer = -1.0f;
+
+        //攻撃用の当たり判定をON(仮に全身攻撃。演出に合わせて調整してください)
+        LeftHand.enabled = true;
+        RightHand.enabled = true;
+        LeftFoot.enabled = true;
+        RightFoot.enabled = true;
     }
 
     void Standing()
