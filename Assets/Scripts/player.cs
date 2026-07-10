@@ -1,4 +1,5 @@
 using NUnit.Framework.Constraints;
+using NUnit.Framework.Interfaces;
 using UnityEditor.Rendering.LookDev;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -22,7 +23,7 @@ using UnityEngine.InputSystem;
 // ・攻撃時間やしゃがみ判定のしきい値は [SerializeField] にして
 //   Inspectorから調整できるようにしている。
 [RequireComponent(typeof(PlayerInput))]
-public class test : MonoBehaviour
+public class Player : MonoBehaviour
 {
     // 外部（GameMNG等）に見せるおおまかな状態。既存の呼び出し互換のため維持
     public enum Status
@@ -93,7 +94,7 @@ public class test : MonoBehaviour
     [Header("ステータス")]
     public int HP = 100;                     // 体力
     public int atk = 10;                     // 攻撃力
-    public test.Status Player_status;        // 外部から参照される、プレイヤーの現在の大まかな状態
+    public Player.Status Player_status;        // 外部から参照される、プレイヤーの現在の大まかな状態
 
     //=====================================================
     // ★各アクションの持続時間（Inspectorで調整可能）
@@ -136,7 +137,8 @@ public class test : MonoBehaviour
     // ★外部参照
     //=====================================================
     [Header("参照")]
-    public Enemy enemy;                              // 対戦相手（敵）
+    public Enemy enemy;                              // 対戦相手（敵）CPUの場合はEnemyスクリプトをアタッチしたオブジェクトを指定する
+    public Player enemyPlayer;                       // 対戦相手（人間）プレイヤーの場合はPlayerスクリプトをアタッチしたオブジェクトを指定する 
 
     public Animator animator;                         // プレイヤーのAnimator
     public FightingCameraController fightingCamera;   // 演出用カメラ
@@ -556,7 +558,7 @@ public class test : MonoBehaviour
 
         rebornTimer += Time.deltaTime;
         Player_status = Status.Reborn;
-        mng.SettestStatus(Status.Reborn);
+        mng.SettestStatus(Player_status);
 
         //ダウンした瞬間、一度だけ顔・拳へのクローズアップカメラを開始する
         if (!rebornCamStarted && fightingCamera != null)
@@ -603,8 +605,8 @@ public class test : MonoBehaviour
         {
             //制限時間内に復活できず力尽きた
             currentState = PlayerState.Dead;
-            Player_status = Status.Dead;
-            mng.SettestStatus(Status.Dead);
+            Player_status = Player.Status.Dead;
+            mng.SettestStatus(Player_status);
 
             if (fightingCamera != null)
             {
@@ -697,4 +699,23 @@ public class test : MonoBehaviour
         Debug.Log(HP);
         Debug.Log(PlayerName);
     }
+
+    //プレイヤーの攻撃が相手プレイヤーにヒットした場合の処理
+    void EnemyPlayer(Player player)
+    {
+        if (player != null)
+        {
+            // 相手のプレイヤー番号が、自分（このスクリプト）の番号と違う場合
+            if (player.PlayerName != this.PlayerName)
+            {
+                Debug.Log($"プレイヤー{this.PlayerName}の攻撃が、プレイヤー{player.PlayerName}にヒット！");
+
+                // 相手に10ダメージ与える
+                player.TakeDamage(10);
+            }
+        }
+    }
+
+    // 相手プレイヤーにダメージを与えるための公開メソッド
+    public void TakeDamage(int i) => HP -= i;
 }

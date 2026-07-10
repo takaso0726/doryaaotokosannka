@@ -27,7 +27,7 @@ public class GameMNG : MonoBehaviour
     //プレイヤーが倒されてからの経過時間
     float playerChangeTimer;
     //プレイヤーの状態
-    test.Status playerStatus;
+    Player.Status playerStatus;
 
     [Header("勝敗カメラ演出")]
     //プレイヤーのTransform（勝利時にカメラがズームする対象）
@@ -55,7 +55,7 @@ public class GameMNG : MonoBehaviour
         E_HPbar.value = EnemyHP;
 
         playerChangeTimer = 0.0f;
-        playerStatus = test.Status.Live;
+        playerStatus = Player.Status.Live;
 
         //効果音再生用のAudioClipを取得
         BGM_Lv1 = GetComponent<AudioSource>();
@@ -70,7 +70,7 @@ public class GameMNG : MonoBehaviour
     void Update()
     {
         //Playerの状態がDeadなら
-        if(playerStatus == test.Status.Dead)
+        if(playerStatus == Player.Status.Dead)
         {
             //経過時間を加える
             playerChangeTimer += Time.deltaTime;
@@ -83,7 +83,7 @@ public class GameMNG : MonoBehaviour
                 playerChangeTimer = 0.0f;
             }
         }
-        else if(playerStatus == test.Status.Win)
+        else if(playerStatus == Player.Status.Win)
         {
             //経過時間を加える
             playerChangeTimer += Time.deltaTime;
@@ -130,19 +130,19 @@ public class GameMNG : MonoBehaviour
     }
 
     //他のC#スクリプトから呼び出す変数
-    public void SettestStatus(test.Status ps)
+    public void SettestStatus(Player.Status ps)
     {
         playerStatus = ps;
 
         //勝敗が決まったら、勝った方にカメラをズームする
         if (cameraController != null)
         {
-            if (playerStatus == test.Status.Win)
+            if (playerStatus == Player.Status.Win)
             {
                 //プレイヤーが勝利
                 cameraController.FocusOnTarget(PlayerTransform);
             }
-            else if (playerStatus == test.Status.Dead)
+            else if (playerStatus == Player.Status.Dead)
             {
                 //プレイヤーが敗北＝敵の勝利
                 cameraController.FocusOnTarget(EnemyTransform);
