@@ -8,7 +8,7 @@ public class Enemy : MonoBehaviour
     float ActionTimer;  //タイマー
     public int atk;
     public int HP;
-    public test Player;
+    public Player player;
     bool Menflag;
     public Animator animator;
     Rigidbody rb;                 //Rigidbody型の変数
@@ -136,8 +136,6 @@ public class Enemy : MonoBehaviour
     CapsuleCollider LeftLeg;
 
     float InitRotate;
-
-    bool flag;
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
@@ -191,7 +189,6 @@ public class Enemy : MonoBehaviour
 
         AtkHitboxOFF();
         InitRotate = transform.rotation.y;
-        flag = true;
 
     }
 
@@ -218,8 +215,8 @@ public class Enemy : MonoBehaviour
 
             // ==== ここからがCPUの「判断」部分 ====
             // プレイヤーとの距離、プレイヤーが攻撃中かどうかを見て行動を選ぶ
-            float distance = Mathf.Abs(Player.transform.position.z - transform.position.z);
-            bool playerIsAttacking = Player.Player_status == test.Status.Attack;
+            float distance = Mathf.Abs(player.transform.position.z - transform.position.z);
+            bool playerIsAttacking = player.Player_status == Player.Status.Attack;
 
             // 難易度が低いほど、攻撃の気配に気づけないことがある(見逃し)
             bool noticedAttack = playerIsAttacking && (Random.value <= defenseAwareness);
@@ -417,13 +414,12 @@ public class Enemy : MonoBehaviour
                 ActionTimer = reactionInterval;
 
                 //投げれるか距離でチェック(距離と相手の状態で判断)
-                if (Player.Player_status != test.Status.Attack && (Player.transform.position.z - transform.position.z < 1.75f))
+                if (player.Player_status != Player.Status.Attack && (player.transform.position.z - transform.position.z < 1.75f))
                 {
                     Debug.Log("投げ成功");
-                    Player.transform.Translate(0.0f, 0.0f, -0.0025f);
-                    Player.animator.SetTrigger("Thrown");
-                    Player.damege(Mathf.RoundToInt(5 * damageMultiplier));
-                    flag = false;
+                    player.transform.Translate(0.0f, 0.0f, -0.0025f);
+                    player.animator.SetTrigger("Thrown");
+                    player.damege(Mathf.RoundToInt(5 * damageMultiplier));
                 }
                 break;
 
@@ -446,9 +442,9 @@ public class Enemy : MonoBehaviour
             Debug.Log("エネミーのHP : " + HP);
             if(Menflag)
             {
-                atk += Player.atk;
+                atk += player.atk;
 
-                HP -= Player.atk / 2;
+                HP -= player.atk / 2;
             }
             else
             {
@@ -464,9 +460,9 @@ public class Enemy : MonoBehaviour
                 Destroy(HitParticle.gameObject, 1.0f);
 
                 //プレイヤーのHPを減らす
-                HP -= Player.atk;
+                HP -= player.atk;
             }
-            Player.atk = 10;
+            player.atk = 10;
 
             //一旦ボツ
             GameMNG mng = GameObject.Find("ManagerObject").GetComponent<GameMNG>();
@@ -475,7 +471,7 @@ public class Enemy : MonoBehaviour
             if(HP <= 0)
             {
                 //マネージャーに「勝利状態」を設定する
-                mng.SettestStatus(test.Status.Win);
+                mng.SettestStatus(Player.Status.Win);
             }
         }
     }

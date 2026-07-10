@@ -7,11 +7,13 @@ public class GameMNG : MonoBehaviour
     //変数宣言
     public Text PlayerHP_Text;
     public Text EnemyHP_Text;
-    public Text Player_Timer_Text;
-    public Text Player_Cnt_Text;
+   // public Text Player_Timer_Text;
+    //public Text Player_Cnt_Text;
 
-    int PlayerHP;
-    int EnemyHP;
+    //外部参照
+    public Player p1;
+    public Player p2;
+    public Enemy  e1;
 
     public Slider P_HPbar;
     public Slider E_HPbar;
@@ -27,7 +29,7 @@ public class GameMNG : MonoBehaviour
     //プレイヤーが倒されてからの経過時間
     float playerChangeTimer;
     //プレイヤーの状態
-    test.Status playerStatus;
+    Player.Status playerStatus;
 
     [Header("勝敗カメラ演出")]
     //プレイヤーのTransform（勝利時にカメラがズームする対象）
@@ -37,25 +39,26 @@ public class GameMNG : MonoBehaviour
     //シーン中のカメラコントローラー
     public FightingCameraController cameraController;
 
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
+    //初期化
     void Start()
     {
         
-        PlayerHP_Text.text = "100";
-        EnemyHP_Text.text = "100";
-        PlayerHP = 100;
-        EnemyHP = 100;
-
-        Player_Timer_Text.text = "0";
-        Player_Cnt_Text.text = "0";
+        //ド根性復活のタイマー
+       // Player_Timer_Text.text = "0";
+        //ド根性復活の回数
+       // Player_Cnt_Text.text = "0";
+        //わからんけどなんかのタイマーとカウント
         PTimer = 0;
         PCnt = 0;
 
-        P_HPbar.value = PlayerHP;
-        E_HPbar.value = EnemyHP;
+        //HPバーのパーセント
+        P_HPbar.value = p1.HP;
+        E_HPbar.value = p2.HP;
+
 
         playerChangeTimer = 0.0f;
-        playerStatus = test.Status.Live;
+        //プレイヤーのステータス
+        playerStatus = Player.Status.Live;
 
         //効果音再生用のAudioClipを取得
         BGM_Lv1 = GetComponent<AudioSource>();
@@ -66,11 +69,11 @@ public class GameMNG : MonoBehaviour
         BGM_Lv1.Play();
     }
 
-    // Update is called once per frame
+    //更新処理
     void Update()
     {
         //Playerの状態がDeadなら
-        if(playerStatus == test.Status.Dead)
+        if(playerStatus == Player.Status.Dead)
         {
             //経過時間を加える
             playerChangeTimer += Time.deltaTime;
@@ -83,7 +86,7 @@ public class GameMNG : MonoBehaviour
                 playerChangeTimer = 0.0f;
             }
         }
-        else if(playerStatus == test.Status.Win)
+        else if(playerStatus == Player.Status.Win)
         {
             //経過時間を加える
             playerChangeTimer += Time.deltaTime;
@@ -99,50 +102,43 @@ public class GameMNG : MonoBehaviour
             
     }
 
-    public void Player_ReduceHP(int hp)
+    //プレイヤーのHPを表示
+    public void Player_ReduceHP(int hp, string PlayerName)
     {
-        //HPを減らす
-        PlayerHP = hp;
         //HPを表示
-        PlayerHP_Text.text = PlayerHP.ToString();
-        P_HPbar.value = PlayerHP;
-
+        //PlayerHP_Text.text = p1.ToString();
+        if (PlayerName == "P1") { P_HPbar.value = p1.HP; }
+        if (PlayerName == "P2") { E_HPbar.value = p2.HP; }
     }
-
+    //エネミー側のHPを表示する
     public void Enemy_ReduceHP(int hp)
     {
-        //HPを減らす
-        EnemyHP = hp;
         //HPを表示
-        EnemyHP_Text.text = EnemyHP.ToString();
-        E_HPbar.value = EnemyHP;
-
+        //EnemyHP_Text.text = e1.ToString();
+        E_HPbar.value = e1.HP;
     }
-
+    //ド根性復活のタイマーとカウントを表示する
     public void PlayerUI(float Timer,int Cnt)
     {
-        PTimer = Timer;
-        PCnt = Cnt;
-
-        Player_Timer_Text.text = PTimer.ToString();
-        Player_Cnt_Text.text = PCnt.ToString();
-
+        //ド根性復活のタイマーとカウントを表示する
+        //Player_Timer_Text.text = PTimer.ToString();
+        //Player_Cnt_Text.text = PCnt.ToString();
     }
 
     //他のC#スクリプトから呼び出す変数
-    public void SettestStatus(test.Status ps)
+    public void SettestStatus(Player.Status ps)
     {
         playerStatus = ps;
 
         //勝敗が決まったら、勝った方にカメラをズームする
         if (cameraController != null)
         {
-            if (playerStatus == test.Status.Win)
+            if (playerStatus == Player.Status.Win)
             {
                 //プレイヤーが勝利
                 cameraController.FocusOnTarget(PlayerTransform);
             }
-            else if (playerStatus == test.Status.Dead)
+            else if (playerStatus == Player.Status.Dead)
             {
                 //プレイヤーが敗北＝敵の勝利
                 cameraController.FocusOnTarget(EnemyTransform);
