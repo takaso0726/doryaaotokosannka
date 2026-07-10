@@ -633,9 +633,9 @@ public class Player : MonoBehaviour
     void OnTriggerEnter(Collider collision)
     {
         //当たった対象物の[tag]がEAttack (エネミーによる攻撃)だった場合のみ処理する
-        if (!collision.gameObject.CompareTag("PAttack") || !collision.gameObject.CompareTag("EAttack") || HP <= 0) return;
-
-        if (isGuarding)
+        if (!collision.gameObject.CompareTag("EAttack") || HP <= 0) return;
+        if(!collision.player.PlayerName != this.PlayerName || HP <= 0)
+            if (isGuarding)
         {
             // 仁王立ち（ガード）中に被弾した場合の処理
             atk += enemy.atk;                  // ガード成功で自分の攻撃力に敵の攻撃力を上乗せする
