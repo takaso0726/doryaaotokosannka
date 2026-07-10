@@ -237,7 +237,7 @@ public class Enemy : MonoBehaviour
         }
 
 
-        /*
+        
         //タックル--封印--
         if(HP <= 10)
         {
@@ -273,7 +273,7 @@ public class Enemy : MonoBehaviour
         }
 
 
-        */
+        
     }
 
        
