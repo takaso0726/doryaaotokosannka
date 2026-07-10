@@ -33,7 +33,7 @@ public class Curosr : MonoBehaviour
     //移動処理
     private void MovementCursor()
     {
-        Vector2 stickInput = Gamepad.current != null ? Gamepad.current.rightStick.ReadValue() : Vector2.zero;
+        Vector2 stickInput = Gamepad.current != null ? Gamepad.current.leftStick.ReadValue() : Vector2.zero;
 
         if (stickInput.magnitude > 0.1f)
         {
@@ -107,7 +107,7 @@ public class Curosr : MonoBehaviour
         bool isClicked = false;
 
         if (Gamepad.current != null && Gamepad.current.aButton.wasPressedThisFrame) isClicked = true;
-        if (Mouse.current != null && Mouse.current.rightButton.wasPressedThisFrame) isClicked = true;
+        if (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame) isClicked = true;
 
         if (isClicked)
         {

@@ -1404,6 +1404,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Buttom
   targetScene: TItle
+  buttonText: {fileID: 1787652063}
+  blinkSpeed: 5
 --- !u!1 &1988716012
 GameObject:
   m_ObjectHideFlags: 0
@@ -1554,7 +1556,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 38882780adac9454db97c72171b72845, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Buttom
-  targetScene: InGame
+  targetScene: StageSelect
+  buttonText: {fileID: 1988716014}
+  blinkSpeed: 5
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
