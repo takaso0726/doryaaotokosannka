@@ -634,7 +634,7 @@ public class Player : MonoBehaviour
     {
         //当たった対象物の[tag]がEAttack (エネミーによる攻撃)だった場合のみ処理する
         if (!collision.gameObject.CompareTag("EAttack") || HP <= 0) return;
-        if(!collision.player.PlayerName != this.PlayerName || HP <= 0)
+        //if(!collision.player.PlayerName != this.PlayerName || HP <= 0)
             if (isGuarding)
         {
             // 仁王立ち（ガード）中に被弾した場合の処理

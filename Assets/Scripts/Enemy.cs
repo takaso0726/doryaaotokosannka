@@ -241,7 +241,7 @@ public class Enemy : MonoBehaviour
         //タックル--封印--
         if(HP <= 10)
         {
-            if ((Mathf.Sqrt((transform.position.z - Player.transform.position.z) * (transform.position.z - Player.transform.position.z))) < 3.0f && Enemy_Status == Status.Neutral)
+            if ((Mathf.Sqrt((transform.position.z - player.transform.position.z) * (transform.position.z - player.transform.position.z))) < 3.0f && Enemy_Status == Status.Neutral)
             {
                 //当たり判定ON
                 LeftForeArm.enabled = true;
