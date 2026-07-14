@@ -1,45 +1,35 @@
-ï»¿using System;
+using System;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
 
-// ã‚¿ã‚¤ãƒˆãƒ«ã®ãƒ†ã‚­ã‚¹ãƒˆ
 public class TitileText : MonoBehaviour
 {
-    //å¤‰æ•°å®£è¨€
-    float alpha;        //ã‚¢ãƒ«ãƒ•ã‚¡å€¤ç”¨ã®å¤‰æ•°
-    private int clickCount = 0;ã€€//ã‚¯ãƒªãƒƒã‚¯å›æ•°ã‚’ã‚«ã‚¦ãƒ³ãƒˆ
-    private Title titleScript; // ã‚¿ã‚¤ãƒˆãƒ«ã®ã‚¹ã‚¯ãƒªãƒ—ãƒˆ
-    private TextMeshProUGUI textMeshPro; // ã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆã®ä¿å­˜
+    //•Ï”éŒ¾
+    float alpha;        //ƒAƒ‹ƒtƒ@’l—p‚Ì•Ï”
+    private int clickCount = 0;@//ƒNƒŠƒbƒN‰ñ”‚ğƒJƒEƒ“ƒg
+    private Title titleScript; // ƒ^ƒCƒgƒ‹‚ÌƒXƒNƒŠƒvƒg
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
-        //ã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆã‚’ä¿å­˜
-        textMeshPro = GetComponent<TextMeshProUGUI>();
-
-        //ã‚·ãƒ¼ãƒ³å†…ã‹ã‚‰Titleã‚¹ã‚¯ãƒªãƒ—ãƒˆã‚’ç´ä»˜ã‘
+        alpha = 1.0f;
+        // ƒV[ƒ““à‚©‚çTitleƒXƒNƒŠƒvƒg‚ğ•R•t‚¯
         titleScript = UnityEngine.Object.FindAnyObjectByType<Title>();
     }
 
     // Update is called once per frame
     void Update()
     {
-        alpha = (Mathf.Sin(Time.time * 2.0f) + 1.0f) / 2.0f;
 
-        if (textMeshPro != null)
-        {
-            // ã‚¢ãƒ«ãƒ•ã‚¡å€¤ã‚’åæ˜ 
-            textMeshPro.color = new Color(1.0f, 1.0f, 1.0f, alpha);
-        }
+        alpha = Mathf.Sin(Time.time);
+        gameObject.GetComponent<TextMeshProUGUI>().color = new Color(1.0f, 1.0f, 1.0f, alpha);
     }
 
-    //ã‚¯ãƒªãƒƒã‚¯å›æ•°ã‚’ç¢ºèª
+    // ƒNƒŠƒbƒN‰ñ”‚ğŠm”F
     public void OnCursorClick()
     {
         clickCount++;
-        Debug.Log("ã‚¯ãƒªãƒƒã‚¯ã•ã‚Œã¾ã—ãŸ");
-
         if (clickCount >= 3)
         {
             if (titleScript != null)

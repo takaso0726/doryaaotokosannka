@@ -136,8 +136,6 @@ public class Enemy : MonoBehaviour
     CapsuleCollider LeftLeg;
 
     float InitRotate;
-
-    bool flag;
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
@@ -191,7 +189,6 @@ public class Enemy : MonoBehaviour
 
         AtkHitboxOFF();
         InitRotate = transform.rotation.y;
-        flag = true;
 
     }
 
@@ -237,11 +234,11 @@ public class Enemy : MonoBehaviour
         }
 
 
-        
+        /*
         //タックル--封印--
         if(HP <= 10)
         {
-            if ((Mathf.Sqrt((transform.position.z - player.transform.position.z) * (transform.position.z - player.transform.position.z))) < 3.0f && Enemy_Status == Status.Neutral)
+            if ((Mathf.Sqrt((transform.position.z - Player.transform.position.z) * (transform.position.z - Player.transform.position.z))) < 3.0f && Enemy_Status == Status.Neutral)
             {
                 //当たり判定ON
                 LeftForeArm.enabled = true;
@@ -273,7 +270,7 @@ public class Enemy : MonoBehaviour
         }
 
 
-        
+        */
     }
 
        
@@ -423,7 +420,6 @@ public class Enemy : MonoBehaviour
                     player.transform.Translate(0.0f, 0.0f, -0.0025f);
                     player.animator.SetTrigger("Thrown");
                     player.damege(Mathf.RoundToInt(5 * damageMultiplier));
-                    flag = false;
                 }
                 break;
 
@@ -466,7 +462,7 @@ public class Enemy : MonoBehaviour
                 //プレイヤーのHPを減らす
                 HP -= player.atk;
             }
-                player.atk = 10;
+            player.atk = 10;
 
             //一旦ボツ
             GameMNG mng = GameObject.Find("ManagerObject").GetComponent<GameMNG>();

@@ -1,12 +1,10 @@
-ï»¿using UnityEngine;
+using UnityEngine;
 using UnityEngine.InputSystem; 
 using UnityEngine.SceneManagement;
 
-//ã‚¿ã‚¤ãƒˆãƒ«ã®ãƒ—ãƒ­ã‚°ãƒ©ãƒ 
-
 public class Title : MonoBehaviour
 {
-    //å¤‰æ•°å®£è¨€
+    //•Ï”éŒ¾
     AudioSource se;
     public AudioClip Titlese;
     float CntTimer;
@@ -14,7 +12,7 @@ public class Title : MonoBehaviour
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
-        //åŠ¹æœéŸ³å†ç”Ÿç”¨ã®AudioClipã‚’å–å¾—
+        //Œø‰Ê‰¹Ä¶—p‚ÌAudioClip‚ğæ“¾
         se = GetComponent<AudioSource>();
     }
 
@@ -23,32 +21,32 @@ public class Title : MonoBehaviour
     {
         if (flag)
         {
-            //çµŒéæ™‚é–“ã‚’åŠ ãˆã‚‹
+            //Œo‰ßŠÔ‚ğ‰Á‚¦‚é
             CntTimer += Time.deltaTime;
-            //çµŒéæ™‚é–“ãŒgameOverTImeä»¥ä¸Šã«ãªã£ãŸã‚‰
+            //Œo‰ßŠÔ‚ªgameOverTImeˆÈã‚É‚È‚Á‚½‚ç
             if (CntTimer >= 0.7f)
             {
-                //ã‚¤ãƒ³ã‚²ãƒ¼ãƒ ã‚·ãƒ¼ãƒ³ã‚’èª­ã¿è¾¼ã‚€
-                SceneManager.LoadScene("StageSelect");
+                //ƒCƒ“ƒQ[ƒ€ƒV[ƒ“‚ğ“Ç‚İ‚Ş
+                SceneManager.LoadScene("InGame");
 
             }
         }
     }
 
-    // ä¸‰å›æŠ¼ã•ã‚ŒãŸã¨ãé·ç§»ã™ã‚‹
+    // O‰ñ‰Ÿ‚³‚ê‚½‚Æ‚«‘JˆÚ‚·‚é
     public void OnTextThriceClicked()
     {
-        // ã‚·ãƒ¼ãƒ³ã®é·ç§»ã‚’ã™ã‚‹
+        // ƒV[ƒ“‚Ì‘JˆÚ‚ğ‚·‚é
         TriggerSceneTransition();
     }
 
-    // ã‚·ãƒ¼ãƒ³é·ç§»ã‚’é–‹å§‹ã™ã‚‹å…±é€šã®å‡¦ç†
+    // ƒV[ƒ“‘JˆÚ‚ğŠJn‚·‚é‹¤’Ê‚Ìˆ—
     private void TriggerSceneTransition()
     {
-        if (!flag) // ã¾ã é·ç§»ãŒå§‹ã¾ã£ã¦ã„ãªã‘ã‚Œã°
+        if (!flag) // ‚Ü‚¾‘JˆÚ‚ªn‚Ü‚Á‚Ä‚¢‚È‚¯‚ê‚Î
         {
-            se.PlayOneShot(Titlese); // åŠ¹æœéŸ³ã‚’é³´ã‚‰ã™
-            flag = true;             // é·ç§»é–‹å§‹ãƒ•ãƒ©ã‚°ã‚’ONã«ã™ã‚‹ï¼ˆã“ã‚Œã§Updateå†…ã®ã‚¿ã‚¤ãƒãƒ¼ãŒå‹•ãå‡ºã™ï¼‰
+            se.PlayOneShot(Titlese); // Œø‰Ê‰¹‚ğ–Â‚ç‚·
+            flag = true;             // ‘JˆÚŠJnƒtƒ‰ƒO‚ğON‚É‚·‚éi‚±‚ê‚ÅUpdate“à‚Ìƒ^ƒCƒ}[‚ª“®‚«o‚·j
         }
     }
 }

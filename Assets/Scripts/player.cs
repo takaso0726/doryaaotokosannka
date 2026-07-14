@@ -1,6 +1,3 @@
-using NUnit.Framework.Constraints;
-using NUnit.Framework.Interfaces;
-using UnityEditor.Rendering.LookDev;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -12,16 +9,25 @@ using UnityEngine.InputSystem;
 //=====================================================
 // プレイヤーキャラクターの移動・攻撃・被弾・復活などの一連の挙動を管理するメインスクリプト
 //
-// 【設計方針（旧版からの変更点）】
-// ・行動の切り替えは PlayerState enum + switch 的な if/else で一元管理し、
-//   数値(Control_I)による分岐をやめて可読性を上げている。
-// ・各行動の「拘束時間」は stateTimer 1本にまとめ、必ず Time.deltaTime で
-//   カウントダウンする（秒とフレームが混在するバグを解消）。
-// ・入力コールバック(OnPunch等)は「ボタンが押された」という意図フラグを
-//   立てるだけにし、実際にどの行動へ遷移するかの判断は Update 内の
-//   HandleFreeInput() に集約する。
-// ・攻撃時間やしゃがみ判定のしきい値は [SerializeField] にして
-//   Inspectorから調整できるようにしている。
+// 【今回のバグ修正（被弾判定まわり）】
+// 症状：①攻撃すると自分にもダメージが入る／②相手（P2）の攻撃が当たったり当たらなかったりする
+//
+// 原因は2つ複合していた：
+//   (A) 攻撃用ヒットボックス（手足の子コライダー）は Player 本体の Rigidbody に
+//       属する複合コライダーとして扱われるため、P1の手がP2の胴体に触れると
+//       「P1側のOnTriggerEnter」と「P2側のOnTriggerEnter」が両方発火してしまい、
+//       攻撃した側(P1)まで「被弾した」扱いになっていた。
+//   (B) EnemyPlayer()→TakeDamage() の呼び出し経路が「相手のenemyPlayer(=自分)の
+//       HPを減らす」というたすき掛けになっており、直後の HP -= enemyPlayer.atk と
+//       合わせて同一ヒットで二重にダメージが入っていた。
+//
+// 対策：
+//   (A) 「今トリガーに触れてきたコライダーが“相手の攻撃用ヒットボックス”であるか」
+//       を allHitboxes 配列で判定し、それが true の時だけ被弾処理を行う。
+//       自分のヒットボックスが相手の体（Player_Collider）に触れただけの場合は
+//       この対象では何もしない（それは相手側のOnTriggerEnterで処理される）。
+//   (B) EnemyPlayer()/TakeDamage() の自傷ロジックを削除し、ダメージ適用は
+//       OnTriggerEnter内の1箇所だけに一本化した。
 [RequireComponent(typeof(PlayerInput))]
 public class Player : MonoBehaviour
 {
@@ -53,22 +59,12 @@ public class Player : MonoBehaviour
         KnockedDown,// ダウン中（根性復活チャレンジ中）
         Dead,       // 死亡（復活失敗）
     }
-    //=====================================================
-    // ★タグや名前
-    //=====================================================
-    public string PlayerName = "player";
-    //=====================================================
-    // ★初期向き設定
-    //=====================================================
-    public enum FacingDirection
-    {
-        Forward,    // +Z方向を向く
-        Back,       // -Z方向を向く
-    }
 
-    [Header("初期向き設定")]
-    [Tooltip("ゲーム開始時にモデルが向く方向。対戦相手と向き合うように設定してください。")]
-    [SerializeField] FacingDirection initialFacing = FacingDirection.Forward;
+    //=====================================================
+    // ★名前
+    //=====================================================
+    public string PlayerName;
+    public string PLayerTagName;
     //=====================================================
     // ★移動・向き
     //=====================================================
@@ -137,9 +133,8 @@ public class Player : MonoBehaviour
     // ★外部参照
     //=====================================================
     [Header("参照")]
-    public Enemy enemy;                              // 対戦相手（敵）CPUの場合はEnemyスクリプトをアタッチしたオブジェクトを指定する
-    public Player enemyPlayer;                       // 対戦相手（人間）プレイヤーの場合はPlayerスクリプトをアタッチしたオブジェクトを指定する 
-
+    public Enemy enemy;                              // 対戦相手（敵）
+    public Player enemyPlayer;
     public Animator animator;                         // プレイヤーのAnimator
     public FightingCameraController fightingCamera;   // 演出用カメラ
 
@@ -176,6 +171,12 @@ public class Player : MonoBehaviour
     CapsuleCollider LeftArm, LeftForeArm, LeftHand, LeftFoot, LeftUpLeg, LeftLeg;
     CapsuleCollider Player_Collider;          // 本体（胴体）のコライダー。しゃがみ時にサイズ変更する
     CapsuleCollider[] allHitboxes;            // 全ての攻撃用当たり判定をまとめて操作するための配列
+
+    // ★追加：他プレイヤーから「このコライダーは自分の攻撃用ヒットボックスか？」を
+    //   問い合わせるための公開プロパティ。OnTriggerEnterでの攻撃/被弾の区別に使う。
+    public CapsuleCollider[] AttackHitboxes => allHitboxes;
+    // ★追加：本体（胴体）コライダーの公開プロパティ。同様にOnTriggerEnterで使う。
+    public CapsuleCollider BodyCollider => Player_Collider;
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     // 各種コンポーネント・子オブジェクトの当たり判定の取得と初期化を行う
@@ -219,15 +220,36 @@ public class Player : MonoBehaviour
         atk = 10;
         currentState = PlayerState.Idle;
         Player_status = Status.Live;
-        // Inspectorで指定された初期向きを反映する
-        Vector3 initialDirection = (initialFacing == FacingDirection.Forward) ? Vector3.forward : Vector3.back;
-        transform.rotation = Quaternion.LookRotation(initialDirection, Vector3.up);
+
+        // ★デバッグ用：自分のヒットボックスが正しく取得できているか確認
+        foreach (var hb in allHitboxes)
+        {
+            Debug.Log($"[{gameObject.name}] hitbox取得: {(hb != null ? hb.name + " / owner=" + hb.transform.root.name : "null!")}");
+        }
     }
 
     // 指定した名前の子オブジェクトからCapsuleColliderを取得するヘルパー
     CapsuleCollider FindHitbox(string objectName)
     {
-        return GameObject.Find(objectName).GetComponent<CapsuleCollider>();
+        Transform t = FindDeepChild(transform, objectName);
+        if (t == null)
+        {
+            Debug.LogError($"[{gameObject.name}] ヒットボックス '{objectName}' が自分の階層内に見つかりません");
+            return null;
+        }
+        return t.GetComponent<CapsuleCollider>();
+    }
+
+    // transformの子孫を再帰的に探索し、名前が一致するTransformを返す
+    Transform FindDeepChild(Transform parent, string name)
+    {
+        foreach (Transform child in parent)
+        {
+            if (child.name == name) return child;
+            var found = FindDeepChild(child, name);
+            if (found != null) return found;
+        }
+        return null;
     }
 
     //=====================================================
@@ -297,9 +319,9 @@ public class Player : MonoBehaviour
         bool isFree = currentState == PlayerState.Idle
                    || currentState == PlayerState.Move
                    || currentState == PlayerState.Crouch;
-
         if (isFree)
         {
+            // 拘束のない状態（Idle/Move/Crouch）での入力処理
             HandleFreeInput();
         }
         else
@@ -509,18 +531,28 @@ public class Player : MonoBehaviour
         currentState = PlayerState.Throw;
         stateTimer = throwDuration;
         animator.SetTrigger("Throw-start");
-
-        bool inThrowRange = enemy.Enemy_Status != Enemy.Status.Attack
-            && (enemy.transform.position.z - transform.position.z < 1.75f)
-            && canThrow;
-
-        if (inThrowRange)
+        if (enemyPlayer != null &&
+            enemyPlayer.Player_status != Status.Attack &&
+            (enemyPlayer.transform.position.z - transform.position.z < 1.75f) &&
+            canThrow)
         {
             Debug.Log("投げ成功");
-            enemy.transform.Translate(0f, 0f, -0.0025f);   // 敵を少し引き寄せる
-            enemy.animator.SetTrigger("Thrown");             // 敵に投げられアニメーションを再生させる
-            enemy.damege(5);                                  // 敵に固定ダメージ5を与える
-            canThrow = false;                                 // 一度成功したら再度投げが発動しないようにする
+            enemyPlayer.transform.Translate(0f, 0f, -0.0025f);      // 敵を少し引き寄せる
+            enemyPlayer.animator.SetTrigger("Thrown");              // 敵に投げられアニメーションを再生させる
+            enemyPlayer.damege(5);                                  // 敵に固定ダメージ5を与える
+            canThrow = false;                                       // 一度成功したら再度投げが発動しないようにする
+        }
+
+        if (enemy != null &&
+            enemyPlayer.Player_status != Status.Attack &&
+            (enemyPlayer.transform.position.z - transform.position.z < 1.75f) &&
+            canThrow)
+        {
+            Debug.Log("投げ成功");
+            enemyPlayer.transform.Translate(0f, 0f, -0.0025f);     // 敵を少し引き寄せる
+            enemyPlayer.animator.SetTrigger("Thrown");             // 敵に投げられアニメーションを再生させる
+            enemyPlayer.damege(5);                                 // 敵に固定ダメージ5を与える
+            canThrow = false;                                // 一度成功したら再度投げが発動しないようにする
         }
     }
 
@@ -554,11 +586,11 @@ public class Player : MonoBehaviour
         currentState = PlayerState.KnockedDown;
 
         GameMNG mng = GameObject.Find("ManagerObject").GetComponent<GameMNG>();
-        mng.PlayerUI(rebornTimer, mashCount);
+        //mng.PlayerUI(rebornTimer, mashCount);
 
         rebornTimer += Time.deltaTime;
         Player_status = Status.Reborn;
-        mng.SettestStatus(Player_status);
+        mng.SettestStatus(Status.Reborn);
 
         //ダウンした瞬間、一度だけ顔・拳へのクローズアップカメラを開始する
         if (!rebornCamStarted && fightingCamera != null)
@@ -591,7 +623,9 @@ public class Player : MonoBehaviour
                 rebornTimer = 0f;
                 currentState = PlayerState.Idle;
                 Player_status = Status.Live;
-
+                //UIにHPを反映させるように指示
+                mng = GameObject.Find("ManagerObject").GetComponent<GameMNG>();
+                mng.Player_ReduceHP(HP, PlayerName);
                 //根性復活成功！咆哮して立ち上がる漢を中心に、カメラが180度高速で回り込む
                 if (fightingCamera != null)
                 {
@@ -605,8 +639,8 @@ public class Player : MonoBehaviour
         {
             //制限時間内に復活できず力尽きた
             currentState = PlayerState.Dead;
-            Player_status = Player.Status.Dead;
-            mng.SettestStatus(Player_status);
+            Player_status = Status.Dead;
+            mng.SettestStatus(Status.Dead);
 
             if (fightingCamera != null)
             {
@@ -630,18 +664,37 @@ public class Player : MonoBehaviour
     }
 
     // トリガー判定の当たり判定に何かが接触した時に呼ばれる。敵の攻撃を受けた時の処理を行う
+    //
+    // ★修正済み：この処理は「相手の攻撃用ヒットボックスが自分に触れた場合」だけに
+    //   限定する。以前は「相手プレイヤーのタグを持つ何か」に触れただけで反応していたため、
+    //   自分の攻撃ヒットボックスが相手の体に当たった瞬間、攻撃側の自分にもこの
+    //   イベントが飛んできて、誤って自分自身にダメージが入っていた。
     void OnTriggerEnter(Collider collision)
     {
-        //当たった対象物の[tag]がEAttack (エネミーによる攻撃)だった場合のみ処理する
-        if (!collision.gameObject.CompareTag("EAttack") || HP <= 0) return;
-        //if(!collision.player.PlayerName != this.PlayerName || HP <= 0)
-            if (isGuarding)
+        //地面に当たっている場合は無視
+        if (collision.gameObject.CompareTag("Ground")) return;
+
+        //自分自身のタグ、またはすでに倒れている場合は無視
+        if (collision.gameObject.tag == this.PLayerTagName || HP <= 0) return;
+
+        if (enemyPlayer == null) return;
+
+        // ★追加：触れてきたコライダーが「敵プレイヤーの攻撃用ヒットボックス」で
+        //   なければ、このイベントは無視する。
+        //   （＝自分のヒットボックスが敵の体に当たっただけの、攻撃側視点のイベント）
+        if (!System.Array.Exists(enemyPlayer.AttackHitboxes, hb => hb == collision))
+        {
+            return;
+        }
+
+        //ここまで来たら「敵の攻撃用ヒットボックスが自分の体に当たった」＝正真正銘の被弾
+        if (isGuarding)
         {
             // 仁王立ち（ガード）中に被弾した場合の処理
-            atk += enemy.atk;                  // ガード成功で自分の攻撃力に敵の攻撃力を上乗せする
+            atk += enemyPlayer.atk;                  // ガード成功で自分の攻撃力に敵の攻撃力を上乗せする
             Debug.Log("漢!!");
             se.PlayOneShot(MenBlock_se);       // ガード成功の効果音を再生
-            HP -= enemy.atk / 2;                // ガード中はダメージを半減させる
+            HP -= enemyPlayer.atk / 2;                // ガード中はダメージを半減させる
 
             guardComboCount++;
             if (fightingCamera != null)
@@ -660,12 +713,13 @@ public class Player : MonoBehaviour
             hitParticle.Play();
             Destroy(hitParticle.gameObject, 1.0f);
 
-            HP -= atk;
+            HP -= enemyPlayer.atk;
         }
 
+        //UIにHPを減らすように指示
         GameMNG mng = GameObject.Find("ManagerObject").GetComponent<GameMNG>();
-        mng.Player_ReduceHP(HP);
-        atk = 10;   // 敵の攻撃力を初期値に戻す（一度使ったらリセット）
+        mng.Player_ReduceHP(HP, PlayerName);
+        enemyPlayer.atk = 10;   // 敵の攻撃力を初期値に戻す（一度使ったらリセット）
 
         if (HP < 0) HP = 0;
     }
@@ -691,31 +745,16 @@ public class Player : MonoBehaviour
     public void damege(int n)
     {
         HP -= n;
+        if (HP < 0) HP = 0;
         GameMNG mng = GameObject.Find("ManagerObject").GetComponent<GameMNG>();
         // ★元コードのまま維持。"Enemy_ReduceHP"という名前だが実際にはプレイヤー自身のHPを渡している。
         //   GameMNG側の実装次第では意図通りかもしれないが、要確認。
         mng.Enemy_ReduceHP(HP);
-        //現在のHPの表示
-        Debug.Log(HP);
-        Debug.Log(PlayerName);
     }
 
-    //プレイヤーの攻撃が相手プレイヤーにヒットした場合の処理
-    void EnemyPlayer(Player player)
-    {
-        if (player != null)
-        {
-            // 相手のプレイヤー番号が、自分（このスクリプト）の番号と違う場合
-            if (player.PlayerName != this.PlayerName)
-            {
-                Debug.Log($"プレイヤー{this.PlayerName}の攻撃が、プレイヤー{player.PlayerName}にヒット！");
-
-                // 相手に10ダメージ与える
-                player.TakeDamage(10);
-            }
-        }
-    }
-
-    // 相手プレイヤーにダメージを与えるための公開メソッド
-    public void TakeDamage(int i) => HP -= i;
+    // ★削除：EnemyPlayer() / TakeDamage() は OnTriggerEnter と組み合わさって
+    //   二重ダメージ・自傷ダメージの原因になっていたため撤去した。
+    //   ダメージ適用は OnTriggerEnter 内の1箇所に一本化している。
+    //   もし「攻撃側が能動的に相手へダメージを与える」設計に変更したい場合は、
+    //   OnTriggerEnter側のダメージ処理をこちらに移し替える形で作り直すこと。
 }

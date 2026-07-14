@@ -8,6 +8,10 @@ TagManager:
   - PAttack
   - EAttack
   - Enemy
+  - P1Attack
+  - P2Attack
+  - P1
+  - P2
   layers:
   - Default
   - TransparentFX
@@ -19,10 +23,10 @@ TagManager:
   - Player
   - Enemy
   - EAttack
-  - P1Hurtbox
-  - P1Attackbox
-  - P2Hurtbox
-  - P2Attackbox
+  - P1Attack
+  - P2Attack
+  - P1
+  - P2
   - 
   - 
   - 
