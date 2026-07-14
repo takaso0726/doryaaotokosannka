@@ -16,14 +16,6 @@ public class GameMNG : MonoBehaviour
     public Slider P_HPbar;
     public Slider E_HPbar;
 
-    [Header("漢気ゲージ(0～200%、1本100%の2本ストック制)")]
-    //プレイヤー側 漢気ゲージ(左右2本)
-    public Slider P_KankiBar1;
-    public Slider P_KankiBar2;
-    //敵側 漢気ゲージ(左右2本)
-    public Slider E_KankiBar1;
-    public Slider E_KankiBar2;
-
     float PTimer;
     int PCnt;
 
@@ -62,17 +54,6 @@ public class GameMNG : MonoBehaviour
 
         P_HPbar.value = PlayerHP;
         E_HPbar.value = EnemyHP;
-
-        //漢気ゲージの初期化(1本あたり0～100%)
-        P_KankiBar1.maxValue = 100f;
-        P_KankiBar1.value = 0f;
-        P_KankiBar2.maxValue = 100f;
-        P_KankiBar2.value = 0f;
-
-        E_KankiBar1.maxValue = 100f;
-        E_KankiBar1.value = 0f;
-        E_KankiBar2.maxValue = 100f;
-        E_KankiBar2.value = 0f;
 
         playerChangeTimer = 0.0f;
         playerStatus = Player.Status.Live;
@@ -137,26 +118,6 @@ public class GameMNG : MonoBehaviour
         EnemyHP_Text.text = EnemyHP.ToString();
         E_HPbar.value = EnemyHP;
 
-    }
-
-    //プレイヤーの漢気ゲージを更新(gaugeは0～200%を渡す)
-    public void Player_SetKankiGauge(float gauge)
-    {
-        gauge = Mathf.Clamp(gauge, 0f, 200f);
-        //1本目(0～100%)
-        P_KankiBar1.value = Mathf.Clamp(gauge, 0f, 100f);
-        //2本目(100～200%)
-        P_KankiBar2.value = Mathf.Clamp(gauge - 100f, 0f, 100f);
-    }
-
-    //敵の漢気ゲージを更新(gaugeは0～200%を渡す)
-    public void Enemy_SetKankiGauge(float gauge)
-    {
-        gauge = Mathf.Clamp(gauge, 0f, 200f);
-        //1本目(0～100%)
-        E_KankiBar1.value = Mathf.Clamp(gauge, 0f, 100f);
-        //2本目(100～200%)
-        E_KankiBar2.value = Mathf.Clamp(gauge - 100f, 0f, 100f);
     }
 
     public void PlayerUI(float Timer,int Cnt)
