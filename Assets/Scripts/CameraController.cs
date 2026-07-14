@@ -41,12 +41,38 @@ public class FightingCameraController : MonoBehaviour
     [Tooltip("注視点の回転スムーズさ")]
     public float rotationSmoothTime = 0.2f;
 
-    [Header("勝利演出（フォーカス）設定")]
-    [Tooltip("勝利したキャラクターにズームする際のカメラ距離")]
-    public float focusZoomDistance = 4f;
+    [Header("勝利演出（漢の背中カメラ）設定")]
+    [Tooltip("完全K.O.の瞬間から、勝者の背後・ローアングルへ回り込みきるまでの時間（秒／実時間）")]
+    public float focusOrbitDuration = 1.2f;
 
-    [Tooltip("フォーカス演出時、対象を見る高さオフセット")]
-    public float focusLookAtHeightOffset = 1.2f;
+    [Tooltip("回り込み完了後、勝者の背中からどれだけ離れるか（最終カメラ距離）")]
+    public float focusZoomDistance = 2.5f;
+
+    [Tooltip("回り込み完了後のカメラの高さ（低いほど見上げるローアングルになる）")]
+    public float focusFinalHeight = 0.5f;
+
+    [Tooltip("背中越しの画にするため、勝者の前方どのあたりを注視点にするか（前方への距離）")]
+    public float focusLookAheadDistance = 3.0f;
+
+    [Tooltip("注視点の高さ。頭上寄りにするとシルエットが強調される")]
+    public float focusLookAtHeightOffset = 1.6f;
+
+    [Tooltip("回り込みのイージングの強さ。大きいほど終盤で急激に減速し、キレのある止まり方になる")]
+    public float focusOrbitEasePower = 3f;
+
+    [Tooltip("回り込み完了後、勝利ポーズの微妙な動きに追従する際のスムーズさ")]
+    public float focusHoldSmoothTime = 0.15f;
+
+    [Header("勝利演出（スローモーション制御）")]
+    [Tooltip("ONの場合、このスクリプトがTime.timeScaleを直接操作してスローモーションを作る。GameMNG側で別途スローモーションを管理する場合はOFFにする")]
+    public bool focusControlsTimeScale = true;
+
+    [Tooltip("スローモーション中のTime.timeScale（小さいほど強くスローになる）")]
+    [Range(0.01f, 1f)]
+    public float focusSlowTimeScale = 0.15f;
+
+    [Tooltip("スローモーションを維持する実時間（秒／unscaled）。経過後は自動的にTime.timeScaleを元へ戻す")]
+    public float focusSlowMotionRealDuration = 1.8f;
 
     [Header("仁王立ち被弾演出（ガードインパクトカメラ）")]
     [Tooltip("被弾した瞬間、対象からどれだけ離れるか（かなり近距離にして威圧感を出す）")]
@@ -132,9 +158,18 @@ public class FightingCameraController : MonoBehaviour
     private Vector3 _currentLookAtVelocity;
     private Vector3 _smoothedLookAt;
 
-    // フォーカス（勝者ズーム）関連
+    // フォーカス（勝者への漢の背中カメラ）関連
     private bool _isFocusMode = false;
+    private bool _focusHoldMode = false;
     private Transform _focusTarget;
+    private float _focusOrbitTimer = 0f;
+    private float _focusOrbitStartAngle;
+    private float _focusOrbitStartDistance;
+    private float _focusOrbitStartHeight;
+    private Vector3 _focusVelocityPos;
+    private bool _focusSlowMotionActive = false;
+    private float _focusSlowMotionTimer = 0f;
+    private float _originalTimeScale = 1f;
 
     // 仁王立ち被弾（ガードインパクト）関連
     private bool _isGuardImpactMode = false;
@@ -166,6 +201,13 @@ public class FightingCameraController : MonoBehaviour
         // Volumeの重みは常にスムーズに追従させる（演出のON/OFFに関わらず処理）
         UpdateGuardImpactVolume();
 
+        // 完全K.O.が決まった瞬間の「漢の背中カメラ」は、他の全演出より最優先で処理する
+        if (_isFocusMode)
+        {
+            UpdateFocusCamera();
+            return;
+        }
+
         // 仁王立ちで攻撃を受け止めた直後は、最優先でローアングルの被弾カメラを処理する
         if (_isGuardImpactMode)
         {
@@ -184,13 +226,6 @@ public class FightingCameraController : MonoBehaviour
         if (_isRebornCloseUpMode)
         {
             UpdateRebornCloseUpCamera();
-            return;
-        }
-
-        // 勝敗が決まり、勝者へのフォーカス演出中の場合は専用の処理を行う
-        if (_isFocusMode)
-        {
-            UpdateFocusCamera();
             return;
         }
 
@@ -285,45 +320,82 @@ public class FightingCameraController : MonoBehaviour
     }
 
     /// <summary>
-    /// フォーカスモード中のカメラ更新処理
-    /// 指定した勝者キャラクターにズームして注視する
+    /// フォーカスモード（漢の背中カメラ）中の毎フレーム更新処理。
+    /// 前半：現在位置から勝者の背後・ローアングルへ回り込む（オービット）。
+    /// 後半：回り込みきった位置を保持しつつ、勝利ポーズの微妙な動きに追従する。
     /// </summary>
     private void UpdateFocusCamera()
     {
-        // フォーカス対象が消えていたら何もしない
-        if (_focusTarget == null) return;
+        // フォーカス対象が消えていたら通常モードへ戻す
+        if (_focusTarget == null)
+        {
+            ClearFocus();
+            return;
+        }
 
-        // 注視点（勝者の少し上）をスムーズに更新
-        Vector3 lookAtTarget = _focusTarget.position + Vector3.up * focusLookAtHeightOffset;
-        _smoothedLookAt = Vector3.SmoothDamp(
-            _smoothedLookAt,
-            lookAtTarget,
-            ref _currentLookAtVelocity,
-            rotationSmoothTime
-        );
+        // スローモーションの保持時間は、Time.timeScaleの影響を受けないunscaledDeltaTimeでカウントする
+        if (_focusSlowMotionActive)
+        {
+            _focusSlowMotionTimer -= Time.unscaledDeltaTime;
+            if (_focusSlowMotionTimer <= 0f)
+            {
+                Time.timeScale = _originalTimeScale;
+                _focusSlowMotionActive = false;
+            }
+        }
 
-        // カメラ距離をフォーカス用の距離までスムーズに詰める
-        _currentDistance = Mathf.SmoothDamp(
-            _currentDistance,
-            focusZoomDistance,
-            ref _velocityZoom,
-            zoomSmoothTime
-        );
+        // 目標角度：勝者の「背後」＝Forwardの逆方向
+        Vector3 backDir = -_focusTarget.forward;
+        float targetAngle = Mathf.Atan2(backDir.x, backDir.z) * Mathf.Rad2Deg;
 
-        // オフセット方向を距離に応じてスケーリングしてカメラ目標位置を算出
-        Vector3 offsetDirection = baseOffset.normalized;
-        Vector3 desiredCameraPos = _smoothedLookAt + offsetDirection * _currentDistance;
+        if (!_focusHoldMode)
+        {
+            // 回り込み演出中は実時間（unscaledDeltaTime）で進行させる。
+            // スローモーション中でも、狙った実時間ぴったりで回り込みが完了するようにするため
+            _focusOrbitTimer += Time.unscaledDeltaTime;
+            float t = Mathf.Clamp01(_focusOrbitTimer / Mathf.Max(0.0001f, focusOrbitDuration));
+            float eased = 1f - Mathf.Pow(1f - t, Mathf.Max(1f, focusOrbitEasePower));
 
-        // カメラ位置をスムーズに移動
-        transform.position = Vector3.SmoothDamp(
-            transform.position,
-            desiredCameraPos,
-            ref _velocityPos,
-            followSmoothTime
-        );
+            float angle = Mathf.LerpAngle(_focusOrbitStartAngle, targetAngle, eased);
+            float distance = Mathf.Lerp(_focusOrbitStartDistance, focusZoomDistance, eased);
+            float height = Mathf.Lerp(_focusOrbitStartHeight, focusFinalHeight, eased);
 
-        // 常に勝者を見るように回転
-        transform.LookAt(_smoothedLookAt);
+            float rad = angle * Mathf.Deg2Rad;
+            Vector3 orbitOffset = new Vector3(Mathf.Sin(rad), 0f, Mathf.Cos(rad)) * distance;
+            Vector3 pos = _focusTarget.position + orbitOffset;
+            pos.y = _focusTarget.position.y + height;
+            transform.position = pos;
+
+            if (t >= 1f)
+            {
+                _focusHoldMode = true;
+            }
+        }
+        else
+        {
+            // 回り込み完了後：勝者の真後ろ・ローアングルを維持しつつ、
+            // 勝利ポーズの微妙な動きにだけスムーズに追従する
+            Vector3 holdOffset = backDir.normalized * focusZoomDistance;
+            Vector3 desiredPos = _focusTarget.position + holdOffset;
+            desiredPos.y = _focusTarget.position.y + focusFinalHeight;
+
+            transform.position = Vector3.SmoothDamp(
+                transform.position,
+                desiredPos,
+                ref _focusVelocityPos,
+                focusHoldSmoothTime,
+                Mathf.Infinity,
+                Time.unscaledDeltaTime
+            );
+        }
+
+        // 注視点：勝者のやや前方・頭上あたりを見ることで、後ろ姿のシルエットを強調する
+        Vector3 lookAtTarget = _focusTarget.position
+            + _focusTarget.forward * focusLookAheadDistance
+            + Vector3.up * focusLookAtHeightOffset;
+
+        transform.LookAt(lookAtTarget);
+        _smoothedLookAt = lookAtTarget;
     }
 
     /// <summary>
@@ -557,25 +629,58 @@ public class FightingCameraController : MonoBehaviour
     }
 
     /// <summary>
-    /// 勝敗決定時に呼び出す。指定したキャラクターにカメラをズームさせる
-    /// （GameMNG等、勝敗を管理するスクリプトから呼び出す想定）
+    /// 完全K.O.が決まった瞬間に呼び出す。「漢の背中カメラ」を開始する。
+    /// スローモーションになりながら、勝者の背後・ローアングルへカメラが回り込む。
+    /// （GameMNG等、勝敗判定を管理するスクリプトから、根性復活の余地がない完全K.O.確定時に呼び出す想定）
     /// </summary>
+    /// <param name="target">勝利したキャラクターのTransform</param>
     public void FocusOnTarget(Transform target)
     {
         if (target == null) return;
 
+        // 他の演出モードと状態が競合しないよう、すべて解除してから開始する
+        ClearGuardImpact();
+        ClearReborn();
+
         _isFocusMode = true;
+        _focusHoldMode = false;
         _focusTarget = target;
+        _focusOrbitTimer = 0f;
+        _focusVelocityPos = Vector3.zero;
+
+        // 現在のカメラ位置を「角度・水平距離・高さ」に分解し、回り込みの開始値として保存する
+        // （直前がどの演出だったとしても、そこから違和感なく繋げて回り込むため）
+        Vector3 toCam = transform.position - target.position;
+        _focusOrbitStartHeight = toCam.y;
+        toCam.y = 0f;
+        _focusOrbitStartDistance = toCam.magnitude;
+        _focusOrbitStartAngle = Mathf.Atan2(toCam.x, toCam.z) * Mathf.Rad2Deg;
+
+        // スローモーション開始（このスクリプトがTime.timeScaleを管理する設定の場合のみ）
+        if (focusControlsTimeScale)
+        {
+            _originalTimeScale = Time.timeScale;
+            Time.timeScale = focusSlowTimeScale;
+            _focusSlowMotionActive = true;
+            _focusSlowMotionTimer = focusSlowMotionRealDuration;
+        }
     }
 
     /// <summary>
-    /// フォーカス演出を終了し、通常の追従モードへ戻す
-    /// （リマッチやシーン遷移前のリセット等で使用）
+    /// フォーカス演出（漢の背中カメラ）を終了し、通常の追従モードへ戻す
+    /// （リザルト画面遷移前やリマッチ時などに使用。スローモーション中に呼ばれた場合はTime.timeScaleも必ず元へ戻す）
     /// </summary>
     public void ClearFocus()
     {
         _isFocusMode = false;
+        _focusHoldMode = false;
         _focusTarget = null;
+
+        if (_focusSlowMotionActive)
+        {
+            Time.timeScale = _originalTimeScale;
+            _focusSlowMotionActive = false;
+        }
     }
 
     /// <summary>
@@ -597,6 +702,19 @@ public class FightingCameraController : MonoBehaviour
         if (targets.Contains(t))
         {
             targets.Remove(t);
+        }
+    }
+
+    /// <summary>
+    /// スローモーション中にこのコンポーネントが無効化・破棄された場合の保険。
+    /// Time.timeScaleが1未満のまま固まってしまう事故を防ぐ
+    /// </summary>
+    private void OnDisable()
+    {
+        if (_focusSlowMotionActive)
+        {
+            Time.timeScale = _originalTimeScale;
+            _focusSlowMotionActive = false;
         }
     }
 
