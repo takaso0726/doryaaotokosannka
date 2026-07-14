@@ -26,7 +26,7 @@ public class Curosr : MonoBehaviour
         if (rectTransform == null) return;
 
         MovementCursor();
-        CheckCollision();
+        //CheckCollision();
         HandleInput();
     }
 
@@ -64,6 +64,7 @@ public class Curosr : MonoBehaviour
     //周辺のボタンを探す
     private void CheckCollision()
     {
+        /*
         // 画面内にある「ICursorClickable」を持っているスクリプトをすべて検索
         var clickables = UnityEngine.Object.FindObjectsByType<MonoBehaviour>(FindObjectsInactive.Exclude);
 
@@ -97,6 +98,7 @@ public class Curosr : MonoBehaviour
             hoveredButton = closestButton;
             if (hoveredButton != null) hoveredButton.OnCursorEnter();
         }
+        */
     }
 
     //入力判定

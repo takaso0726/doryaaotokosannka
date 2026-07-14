@@ -49,7 +49,6 @@ public class Enemy : MonoBehaviour
         Crouch,     //しゃがみ(回避寄り)
         Stand,      //仁王立ち(フェイント/カウンター狙い)
         Idle,       //何もしない(様子見)
-        Hissatsu,   //必殺技(漢気ゲージ消費)
     }
 
     // 距離の閾値。この値を境に「近距離/中距離/遠距離」を切り替える
@@ -67,20 +66,6 @@ public class Enemy : MonoBehaviour
 
     [Header("CPU難易度設定")]
     public Difficulty difficulty = Difficulty.Normal;
-
-    [Header("漢気ゲージ")]
-    //現在の漢気ゲージ(0～200%、100%で1ストック)
-    public float KankiGauge = 0f;
-    //ゲージの最大値(2ストック分)
-    public float MaxKankiGauge = 200f;
-    //必殺技の発動に必要なゲージ量(1ストック分)
-    public float KankiGaugeCost = 100f;
-    //仁王立ちで一度耐えるごとの増加量
-    public float KankiGainOnGuard = 20f;
-    //必殺技用アニメーショントリガー名
-    public string HissatsuTriggerName = "Hissatsu";
-    //ゲージが満タンの時に必殺技を選択する確率(0〜1)
-    [Range(0f, 1f)] public float hissatsuChanceWhenReady = 0.5f;
 
     [Tooltip("ONの場合、Difficultyの選択に応じて下記パラメータを自動設定する。手動で細かく調整したい場合はOFFにする")]
     public bool useDifficultyPreset = true;
@@ -151,8 +136,6 @@ public class Enemy : MonoBehaviour
     CapsuleCollider LeftLeg;
 
     float InitRotate;
-
-    bool flag;
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
@@ -206,7 +189,6 @@ public class Enemy : MonoBehaviour
 
         AtkHitboxOFF();
         InitRotate = transform.rotation.y;
-        flag = true;
 
     }
 
@@ -240,19 +222,6 @@ public class Enemy : MonoBehaviour
             bool noticedAttack = playerIsAttacking && (Random.value <= defenseAwareness);
 
             ActionType action = ChooseAction(distance, playerIsAttacking);
-            // 漢気ゲージが1ストック以上溜まっていれば、近距離かつ相手が攻撃中でない時に
-            // 一定確率で必殺技を優先的に選択する
-            bool kankiReady = KankiGauge >= KankiGaugeCost && !playerIsAttacking && distance <= nearRange;
-
-            ActionType action;
-            if (kankiReady && Random.value < hissatsuChanceWhenReady)
-            {
-                action = ActionType.Hissatsu;
-            }
-            else
-            {
-                action = ChooseAction(distance, playerIsAttacking);
-            }
 
             // 難易度が低いほど、判断を誤ってランダムな行動を取ってしまうことがある
             if (Random.value < mistakeChance)
@@ -265,11 +234,11 @@ public class Enemy : MonoBehaviour
         }
 
 
-        
+        /*
         //タックル--封印--
         if(HP <= 10)
         {
-            if ((Mathf.Sqrt((transform.position.z - player.transform.position.z) * (transform.position.z - player.transform.position.z))) < 3.0f && Enemy_Status == Status.Neutral)
+            if ((Mathf.Sqrt((transform.position.z - Player.transform.position.z) * (transform.position.z - Player.transform.position.z))) < 3.0f && Enemy_Status == Status.Neutral)
             {
                 //当たり判定ON
                 LeftForeArm.enabled = true;
@@ -301,7 +270,7 @@ public class Enemy : MonoBehaviour
         }
 
 
-        
+        */
     }
 
        
@@ -451,35 +420,12 @@ public class Enemy : MonoBehaviour
                     player.transform.Translate(0.0f, 0.0f, -0.0025f);
                     player.animator.SetTrigger("Thrown");
                     player.damege(Mathf.RoundToInt(5 * damageMultiplier));
-                    flag = false;
                 }
                 break;
 
             case ActionType.Idle:
                 //何もしない(様子見)
                 ActionTimer = 0.0f;
-                break;
-
-            case ActionType.Hissatsu:
-                //必殺技(漢気ゲージを1ストック消費)
-                KankiGauge = Mathf.Max(0f, KankiGauge - KankiGaugeCost);
-                {
-                    GameMNG mngHissatsu = GameObject.Find("ManagerObject").GetComponent<GameMNG>();
-                    mngHissatsu.Enemy_SetKankiGauge(KankiGauge);
-                }
-
-                animator.ResetTrigger(HissatsuTriggerName);
-                animator.SetTrigger(HissatsuTriggerName);
-                Enemy_Status = Status.Attack;
-
-                //当たり判定をON(仮に全身攻撃。演出に合わせて調整してください)
-                RightHand.enabled = true;
-                LeftHand.enabled = true;
-                RightFoot.enabled = true;
-                LeftFoot.enabled = true;
-
-                //タイマーをリセット(仮の硬直時間)
-                ActionTimer = -reactionInterval;
                 break;
         }
     }
@@ -498,14 +444,7 @@ public class Enemy : MonoBehaviour
             {
                 atk += player.atk;
 
-<<<<<<< HEAD
                 HP -= player.atk / 2;
-=======
-                HP -= Player.atk / 2;
-
-                //漢気ゲージを増加(最大値でクランプ)
-                KankiGauge = Mathf.Min(KankiGauge + KankiGainOnGuard, MaxKankiGauge);
->>>>>>> origin/Timer
             }
             else
             {
@@ -523,13 +462,11 @@ public class Enemy : MonoBehaviour
                 //プレイヤーのHPを減らす
                 HP -= player.atk;
             }
-                player.atk = 10;
+            player.atk = 10;
 
             //一旦ボツ
             GameMNG mng = GameObject.Find("ManagerObject").GetComponent<GameMNG>();
             mng.Enemy_ReduceHP(HP);
-            //漢気ゲージのUIも更新
-            mng.Enemy_SetKankiGauge(KankiGauge);
 
             if(HP <= 0)
             {

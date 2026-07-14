@@ -1,138 +1,84 @@
-ï»¿using UnityEngine;
+using UnityEngine;
 using UnityEngine.InputSystem;
-
-//ã‚¿ã‚¤ãƒˆãƒ«ã®ã‚«ãƒ¼ã‚½ãƒ«
 
 public class TitleCurosr : MonoBehaviour
 {
-    // ã‚¹ãƒ†ã‚£ãƒƒã‚¯ã§ã®ç§»å‹•é€Ÿåº¦
+    // ƒXƒeƒBƒbƒN‚Å‚ÌˆÚ“®‘¬“x
     [SerializeField] private float speed = 500.0f;
 
-    // ç§»å‹•ç¯„å›²ã®åˆ¶é™ï¼ˆç”»é¢å¤–ã«è¡Œã‹ãªã„ã‚ˆã†ã«èª¿æ•´ã™ã‚‹ãŸã‚ã®å€¤ï¼‰
+    // ˆÚ“®”ÍˆÍ‚Ì§ŒÀi‰æ–ÊŠO‚És‚©‚È‚¢‚æ‚¤‚É’²®‚·‚é‚½‚ß‚Ì’lj
     [SerializeField] private Vector2 moveLimit = new Vector2(960.0f, 540.0f);
 
-    // ã‚¿ãƒ¼ã‚²ãƒƒãƒˆã¨ãªã‚‹ãƒ†ã‚­ã‚¹ãƒˆã®RectTransform
+    // ƒ^[ƒQƒbƒg‚Æ‚È‚éƒeƒLƒXƒg‚ÌRectTransform
     [SerializeField] private RectTransform targetTextRect;
-    [SerializeField] private float hitDistance = 100f; // å½“ãŸã‚Šåˆ¤å®šã®åºƒã•
+    [SerializeField] private float hitDistance = 100f; // “–‚½‚è”»’è‚ÌL‚³
 
-    // ã‚¿ã‚¤ãƒˆãƒ«ãŒé‡ãªã£ãŸæ™‚
+    // ƒ^ƒCƒgƒ‹‚ªd‚È‚Á‚½
     private TitileText hoveredText;
     private RectTransform rectTransform;
-
-    private Canvas parentCanvas; // Cunvasã‚’å–å¾—
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
-        // Canvaså†…ã§ã®ä½ç½®åˆ¶å¾¡ã®ãƒˆãƒ©ãƒ³ã‚¹ãƒ•ã‚©ãƒ¼ãƒ ã‚’å–å¾—
+        // Canvas“à‚Å‚ÌˆÊ’u§Œä‚Ìƒgƒ‰ƒ“ƒXƒtƒH[ƒ€‚ğæ“¾
         rectTransform = GetComponent<RectTransform>();
         if (rectTransform != null)
         {
             rectTransform.anchoredPosition = Vector2.zero;
         }
-
-        parentCanvas = GetComponentInParent<Canvas>();
     }
 
     // Update is called once per frame
     void Update()
     {
-        if (rectTransform == null) return;
-
-        //ã‚«ãƒ¼ã‚½ãƒ«ã‚’å‹•ã‹ã™é–¢æ•°
-        MovementCurrosr();
-
-        //é‡ãªã‚Šã‚’ç¢ºèªã™ã‚‹é–¢æ•°
-        CheckCollision();
-
-        //ã‚¯ãƒªãƒƒã‚¯ã‚’åˆ¤å®šã™ã‚‹é–¢æ•°
-        HandleInput();
-    }
-
-    //ãƒã‚¦ã‚¹ã®ç§»å‹•å‡¦ç†
-    private void MovementCurrosr()
-    {
-        Vector2 stickInput = Gamepad.current != null ? Gamepad.current.rightStick.ReadValue() : Vector2.zero;
-
-        if (stickInput.magnitude > 0.1f)
+        Vector2 stickInput = Vector2.zero;
+        if (Gamepad.current != null)
         {
-            // ã‚²ãƒ¼ãƒ ãƒ‘ãƒƒãƒ‰ã§ã®ç§»å‹•å‡¦ç†
+            //‰EƒXƒeƒBƒbƒNirightStickj‚Ì“ü—Í‚ğæ“¾ (-1.0 ` 1.0)
+            stickInput = Gamepad.current.rightStick.ReadValue();
+
+            //•¶š‚ªd‚È‚Á‚½‚¾‚¯”½‰
+            if (Gamepad.current.aButton.wasPressedThisFrame && hoveredText != null)
+            {
+                Debug.Log("Aƒ{ƒ^ƒ“‚ª‰Ÿ‚³‚ê‚Ü‚µ‚½");
+                hoveredText.OnCursorClick();
+            }
+        }
+
+        //ƒXƒeƒBƒbƒN‚ÌˆÚ“®ˆ—
+        if (stickInput.magnitude > 0.1f && rectTransform != null)
+        {
             Vector2 currentPos = rectTransform.anchoredPosition;
             currentPos.x += stickInput.x * speed * Time.deltaTime;
             currentPos.y += stickInput.y * speed * Time.deltaTime;
+
             currentPos.x = Mathf.Clamp(currentPos.x, -moveLimit.x, moveLimit.x);
             currentPos.y = Mathf.Clamp(currentPos.y, -moveLimit.y, moveLimit.y);
+
             rectTransform.anchoredPosition = currentPos;
         }
-        else if (Mouse.current != null)
-        {
-            Vector2 mouseDelta = Mouse.current.delta.ReadValue();
-            if (mouseDelta.magnitude > 0.01f && parentCanvas != null)
-            {
-                Vector2 mousePosition = Mouse.current.position.ReadValue();
-                //ç”»é¢ã®ãƒã‚¦ã‚¹ä½ç½®ã‚’ã€UIï¼ˆCanvasï¼‰ã®åº§æ¨™ã«å¤‰æ›ã™ã‚‹
-                RectTransformUtility.ScreenPointToLocalPointInRectangle(
-                    parentCanvas.transform as RectTransform,
-                    mousePosition,
-                    parentCanvas.worldCamera,
-                    out Vector2 localPoint
-                );
-                rectTransform.anchoredPosition = localPoint;
-            }
-        }
-    }
 
-    //ã‚¯ãƒªãƒƒã‚¯å‡¦ç†
-    private void CheckCollision()
-    {
-        if (targetTextRect != null)
+        //“–‚½‚è”»’èƒ`ƒFƒbƒN
+        if (targetTextRect != null && rectTransform != null)
         {
             float distance = Vector2.Distance(rectTransform.anchoredPosition, targetTextRect.anchoredPosition);
 
-            //é‡ãªã£ã¦ã„ã‚‹ã‹ç¢ºèª
             if (distance < hitDistance)
             {
                 if (hoveredText == null)
                 {
                     hoveredText = targetTextRect.GetComponent<TitileText>();
-                    if (hoveredText != null) Debug.Log("ãƒ†ã‚­ã‚¹ãƒˆã«é‡ãªã‚Šã¾ã—ãŸ");
+                    if (hoveredText != null) Debug.Log("d‚È‚è‚Ü‚µ‚½");
                 }
             }
             else
             {
                 if (hoveredText != null)
                 {
-                    Debug.Log("ãƒ†ã‚­ã‚¹ãƒˆã‹ã‚‰é›¢ã‚Œã¾ã—ãŸ");
+                    Debug.Log("—£‚ê‚Ü‚µ‚½");
                     hoveredText = null;
                 }
             }
-        }
-    }
-
-    //å…¥åŠ›å‡¦ç†
-    private void HandleInput()
-    {
-        if (hoveredText == null) return; //é‡ãªã£ã¦ã„ãªã‘ã‚Œã°ä½•ã‚‚ã—ãªã„
-
-        bool isClicked = false;
-
-        //ã‚²ãƒ¼ãƒ ãƒ‘ãƒƒãƒ‰ã®Aãƒœã‚¿ãƒ³
-        if (Gamepad.current != null && Gamepad.current.aButton.wasPressedThisFrame)
-        {
-            Debug.Log("Aãƒœã‚¿ãƒ³ãŒæŠ¼ã•ã‚Œã¾ã—ãŸ");
-            isClicked = true;
-        }
-
-        //ãƒã‚¦ã‚¹ã®å³ã‚¯ãƒªãƒƒã‚¯
-        if (Mouse.current != null && Mouse.current.rightButton.wasPressedThisFrame)
-        {
-            Debug.Log("å³ã‚¯ãƒªãƒƒã‚¯ãŒæŠ¼ã•ã‚Œã¾ã—ãŸ");
-            isClicked = true;
-        }
-
-        if (isClicked)
-        {
-            hoveredText.OnCursorClick(); //ã‚«ã‚¦ãƒ³ãƒˆã‚’é€²ã‚ã‚‹
         }
     }
 }

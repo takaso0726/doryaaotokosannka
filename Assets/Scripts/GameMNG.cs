@@ -7,22 +7,16 @@ public class GameMNG : MonoBehaviour
     //変数宣言
     public Text PlayerHP_Text;
     public Text EnemyHP_Text;
-    public Text Player_Timer_Text;
-    public Text Player_Cnt_Text;
+   // public Text Player_Timer_Text;
+    //public Text Player_Cnt_Text;
 
-    int PlayerHP;
-    int EnemyHP;
+    //外部参照
+    public Player p1;
+    public Player p2;
+    public Enemy  e1;
 
     public Slider P_HPbar;
     public Slider E_HPbar;
-
-    [Header("漢気ゲージ(0～200%、1本100%の2本ストック制)")]
-    //プレイヤー側 漢気ゲージ(左右2本)
-    public Slider P_KankiBar1;
-    public Slider P_KankiBar2;
-    //敵側 漢気ゲージ(左右2本)
-    public Slider E_KankiBar1;
-    public Slider E_KankiBar2;
 
     float PTimer;
     int PCnt;
@@ -45,36 +39,25 @@ public class GameMNG : MonoBehaviour
     //シーン中のカメラコントローラー
     public FightingCameraController cameraController;
 
-
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
+    //初期化
     void Start()
     {
         
-        PlayerHP_Text.text = "100";
-        EnemyHP_Text.text = "100";
-        PlayerHP = 100;
-        EnemyHP = 100;
-
-        Player_Timer_Text.text = "0";
-        Player_Cnt_Text.text = "0";
+        //ド根性復活のタイマー
+       // Player_Timer_Text.text = "0";
+        //ド根性復活の回数
+       // Player_Cnt_Text.text = "0";
+        //わからんけどなんかのタイマーとカウント
         PTimer = 0;
         PCnt = 0;
 
-        P_HPbar.value = PlayerHP;
-        E_HPbar.value = EnemyHP;
+        //HPバーのパーセント
+        P_HPbar.value = p1.HP;
+        E_HPbar.value = p2.HP;
 
-        //漢気ゲージの初期化(1本あたり0～100%)
-        P_KankiBar1.maxValue = 100f;
-        P_KankiBar1.value = 0f;
-        P_KankiBar2.maxValue = 100f;
-        P_KankiBar2.value = 0f;
-
-        E_KankiBar1.maxValue = 100f;
-        E_KankiBar1.value = 0f;
-        E_KankiBar2.maxValue = 100f;
-        E_KankiBar2.value = 0f;
 
         playerChangeTimer = 0.0f;
+        //プレイヤーのステータス
         playerStatus = Player.Status.Live;
 
         //効果音再生用のAudioClipを取得
@@ -86,7 +69,7 @@ public class GameMNG : MonoBehaviour
         BGM_Lv1.Play();
     }
 
-    // Update is called once per frame
+    //更新処理
     void Update()
     {
         //Playerの状態がDeadなら
@@ -119,54 +102,27 @@ public class GameMNG : MonoBehaviour
             
     }
 
-    public void Player_ReduceHP(int hp)
+    //プレイヤーのHPを表示
+    public void Player_ReduceHP(int hp, string PlayerName)
     {
-        //HPを減らす
-        PlayerHP = hp;
         //HPを表示
-        PlayerHP_Text.text = PlayerHP.ToString();
-        P_HPbar.value = PlayerHP;
-
+        //PlayerHP_Text.text = p1.ToString();
+        if (PlayerName == "P1") { P_HPbar.value = p1.HP; }
+        if (PlayerName == "P2") { E_HPbar.value = p2.HP; }
     }
-
+    //エネミー側のHPを表示する
     public void Enemy_ReduceHP(int hp)
     {
-        //HPを減らす
-        EnemyHP = hp;
         //HPを表示
-        EnemyHP_Text.text = EnemyHP.ToString();
-        E_HPbar.value = EnemyHP;
-
+        //EnemyHP_Text.text = e1.ToString();
+        E_HPbar.value = e1.HP;
     }
-
-    //プレイヤーの漢気ゲージを更新(gaugeは0～200%を渡す)
-    public void Player_SetKankiGauge(float gauge)
-    {
-        gauge = Mathf.Clamp(gauge, 0f, 200f);
-        //1本目(0～100%)
-        P_KankiBar1.value = Mathf.Clamp(gauge, 0f, 100f);
-        //2本目(100～200%)
-        P_KankiBar2.value = Mathf.Clamp(gauge - 100f, 0f, 100f);
-    }
-
-    //敵の漢気ゲージを更新(gaugeは0～200%を渡す)
-    public void Enemy_SetKankiGauge(float gauge)
-    {
-        gauge = Mathf.Clamp(gauge, 0f, 200f);
-        //1本目(0～100%)
-        E_KankiBar1.value = Mathf.Clamp(gauge, 0f, 100f);
-        //2本目(100～200%)
-        E_KankiBar2.value = Mathf.Clamp(gauge - 100f, 0f, 100f);
-    }
-
+    //ド根性復活のタイマーとカウントを表示する
     public void PlayerUI(float Timer,int Cnt)
     {
-        PTimer = Timer;
-        PCnt = Cnt;
-
-        Player_Timer_Text.text = PTimer.ToString();
-        Player_Cnt_Text.text = PCnt.ToString();
-
+        //ド根性復活のタイマーとカウントを表示する
+        //Player_Timer_Text.text = PTimer.ToString();
+        //Player_Cnt_Text.text = PCnt.ToString();
     }
 
     //他のC#スクリプトから呼び出す変数
