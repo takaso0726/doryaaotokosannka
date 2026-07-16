@@ -1,3 +1,4 @@
+using System.Collections;
 using NUnit.Framework.Constraints;
 using NUnit.Framework.Interfaces;
 using UnityEditor.Rendering.LookDev;
@@ -81,7 +82,6 @@ public class Player : MonoBehaviour
     //=====================================================
     // ★名前
     //=====================================================
-    public string PlayerName;
     public string PLayerTagName;
     //=====================================================
     // ★移動・向き
@@ -119,7 +119,24 @@ public class Player : MonoBehaviour
     [SerializeField] float upKickDuration = 0.7f;   // 上キックの拘束時間
     [SerializeField] float downKickDuration = 0.5f; // 下キックの拘束時間
     [SerializeField] float guardDuration = 0.5f;    // 仁王立ちの拘束時間
-    [SerializeField] float throwDuration = 1.5f;    // 投げの拘束時間
+
+    //=====================================================
+    // ★投げ（コマンド投げ）仕様設定
+    //   仕様：ガード不能のコマンド投げ。発生5～7F、空振り時は大きな隙。
+    //   命中した瞬間、双方の操作を無効化してカットイン演出へ強制移行する。
+    //=====================================================
+    [Header("投げ（コマンド投げ）設定")]
+    [Tooltip("発生フレーム数。60fps換算で5～7Fが目安。")]
+    [SerializeField] int throwStartupFrames = 6;
+    [Tooltip("間合い（この距離以内なら掴み判定が届く）")]
+    [SerializeField] float throwRange = 1.75f;
+    [Tooltip("空振りした時の硬直時間（大きな隙）")]
+    [SerializeField] float throwWhiffRecovery = 1.2f;
+    [Tooltip("投げ成立後、カットイン演出にかける時間（この間は双方の入力を無効化する）")]
+    [SerializeField] float throwCutInDuration = 1.0f;
+
+    // 演出中や被グラブ中など、外部から入力を止めたい時に使う公開フラグ
+    public bool InputLocked { get; private set; }
 
     //=====================================================
     // ★根性復活（ダウン後の復活チャレンジ）設定
@@ -151,14 +168,8 @@ public class Player : MonoBehaviour
     // ★外部参照
     //=====================================================
     [Header("参照")]
-<<<<<<< HEAD
     public Enemy enemy;                              // 対戦相手（敵）CPUの場合はEnemyスクリプトをアタッチしたオブジェクトを指定する
     public Player enemyPlayer;                       // 対戦相手（人間）プレイヤーの場合はPlayerスクリプトをアタッチしたオブジェクトを指定する 
-
-=======
-    public Enemy enemy;                              // 対戦相手（敵）
-    public Player enemyPlayer;
->>>>>>> main
     public Animator animator;                         // プレイヤーのAnimator
     public FightingCameraController fightingCamera;   // 演出用カメラ
 
@@ -244,18 +255,15 @@ public class Player : MonoBehaviour
         atk = 10;
         currentState = PlayerState.Idle;
         Player_status = Status.Live;
-<<<<<<< HEAD
         // Inspectorで指定された初期向きを反映する
         Vector3 initialDirection = (initialFacing == FacingDirection.Forward) ? Vector3.forward : Vector3.back;
         transform.rotation = Quaternion.LookRotation(initialDirection, Vector3.up);
-=======
 
         // ★デバッグ用：自分のヒットボックスが正しく取得できているか確認
         foreach (var hb in allHitboxes)
         {
             Debug.Log($"[{gameObject.name}] hitbox取得: {(hb != null ? hb.name + " / owner=" + hb.transform.root.name : "null!")}");
         }
->>>>>>> main
     }
 
     // 指定した名前の子オブジェクトからCapsuleColliderを取得するヘルパー
@@ -339,6 +347,13 @@ public class Player : MonoBehaviour
     // そうでなければ現在の状態に応じて「拘束中のタイマー消化」か「新しい行動の受付」を行う。
     void Update()
     {
+        // 投げ成立後のカットイン演出中など、操作を無効化したい間はここで止める
+        if (InputLocked)
+        {
+            ClearInputIntents();
+            return;
+        }
+
         if (HP <= 0)
         {
             HandleKnockedDown();
@@ -556,35 +571,118 @@ public class Player : MonoBehaviour
         Destroy(newParticle.gameObject, 1.0f);
     }
 
-    // 投げ（掴み）処理。敵との距離・状態を判定し、条件を満たせば投げを成立させる
+    // 投げ（コマンド投げ）処理。
+    // ガード不能。入力してから throwStartupFrames フレーム後に掴み判定を評価し、
+    // 成立していれば双方の操作を無効化してカットイン演出へ、
+    // 外していれば大きな隙（空振り硬直）を晒す。
     void EnterThrow()
     {
         currentState = PlayerState.Throw;
-        stateTimer = throwDuration;
+        // TickBusyStateが途中で状態を戻してしまわないよう、コルーチン側の管理時間より長めに確保しておく
+        stateTimer = (throwStartupFrames / 60f) + throwWhiffRecovery + throwCutInDuration + 1f;
         animator.SetTrigger("Throw-start");
-        if (enemyPlayer != null &&
-            enemyPlayer.Player_status != Status.Attack &&
-            (enemyPlayer.transform.position.z - transform.position.z < 1.75f) &&
-            canThrow)
+        StartCoroutine(ThrowSequence());
+    }
+
+    IEnumerator ThrowSequence()
+    {
+        //--- 発生フレーム（5～7F想定。60fps換算で待機） ---
+        yield return new WaitForSeconds(throwStartupFrames / 60f);
+
+        // 発生フレーム時点で、掴み判定が相手の喰らい判定に届いているかを判定する
+        // （コマンド投げなのでガード状態は見ない＝ガード不能）
+        bool hitPlayer = enemyPlayer != null &&
+                          enemyPlayer.Player_status != Status.Attack &&
+                          Mathf.Abs(enemyPlayer.transform.position.z - transform.position.z) < throwRange &&
+                          canThrow;
+
+        bool hitEnemy = !hitPlayer &&
+                         enemy != null &&
+                         enemy.Enemy_Status != Enemy.Status.Attack &&
+                         Mathf.Abs(enemy.transform.position.z - transform.position.z) < throwRange &&
+                         canThrow;
+
+        if (hitPlayer)
         {
-            Debug.Log("投げ成功");
-            enemyPlayer.transform.Translate(0f, 0f, -0.0025f);      // 敵を少し引き寄せる
-            enemyPlayer.animator.SetTrigger("Thrown");              // 敵に投げられアニメーションを再生させる
-            enemyPlayer.damege(5);                                  // 敵に固定ダメージ5を与える
-            canThrow = false;                                       // 一度成功したら再度投げが発動しないようにする
+            yield return StartCoroutine(ThrowConnectedWithPlayer(enemyPlayer));
+        }
+        else if (hitEnemy)
+        {
+            yield return StartCoroutine(ThrowConnectedWithEnemy(enemy));
+        }
+        else
+        {
+            //--- 空振り：大きな隙を晒す ---
+            Debug.Log("投げ空振り");
+            animator.SetTrigger("Throw-whiff");
+            yield return new WaitForSeconds(throwWhiffRecovery);
         }
 
-        if (enemy != null &&
-            enemyPlayer.Player_status != Status.Attack &&
-            (enemyPlayer.transform.position.z - transform.position.z < 1.75f) &&
-            canThrow)
+        currentState = PlayerState.Idle;
+    }
+
+    // 対人プレイヤーへの投げが成立した時の処理：演出移行→ダメージ確定→解除
+    IEnumerator ThrowConnectedWithPlayer(Player target)
+    {
+        Debug.Log("投げ成功（対プレイヤー）：演出へ移行");
+        canThrow = false;
+
+        // お互いの操作を無効化してカットイン演出へ強制移行する
+        InputLocked = true;
+        target.SetInputLocked(true);
+
+        target.transform.Translate(0f, 0f, -0.0025f);      // 相手を少し引き寄せる
+        animator.SetTrigger("Throw-hit");
+        target.animator.SetTrigger("Thrown");               // 相手に投げられアニメーションを再生させる
+
+        // 必殺技シーケンス（カットイン演出）をカメラ側へ要求する
+        // ※FightingCameraController側に TriggerGrabCutIn(Transform attacker, Transform victim) の実装が必要
+        if (fightingCamera != null)
         {
-            Debug.Log("投げ成功");
-            enemyPlayer.transform.Translate(0f, 0f, -0.0025f);     // 敵を少し引き寄せる
-            enemyPlayer.animator.SetTrigger("Thrown");             // 敵に投げられアニメーションを再生させる
-            enemyPlayer.damege(5);                                 // 敵に固定ダメージ5を与える
-            canThrow = false;                                // 一度成功したら再度投げが発動しないようにする
+            fightingCamera.TriggerGrabCutIn(transform, target.transform);
         }
+
+        yield return new WaitForSeconds(throwCutInDuration);
+
+        target.damege(5);                                    // 相手に固定ダメージ5を与える
+        atk = 10;                                             // 攻撃力を初期値に戻す
+
+        target.SetInputLocked(false);
+        InputLocked = false;
+    }
+
+    // CPU敵への投げが成立した時の処理：演出移行→ダメージ確定→解除
+    IEnumerator ThrowConnectedWithEnemy(Enemy target)
+    {
+        Debug.Log("投げ成功（対CPU敵）：演出へ移行");
+        canThrow = false;
+
+        InputLocked = true;
+        target.SetInputLocked(true);
+
+        target.transform.Translate(0f, 0f, -0.0025f);
+        animator.SetTrigger("Throw-hit");
+        target.animator.SetTrigger("Thrown");
+
+        if (fightingCamera != null)
+        {
+            fightingCamera.TriggerGrabCutIn(transform, target.transform);
+        }
+
+        yield return new WaitForSeconds(throwCutInDuration);
+
+        target.damege(5);
+        atk = 10;
+
+        target.SetInputLocked(false);
+        InputLocked = false;
+    }
+
+    // 外部（相手側の投げ成立処理など）から入力を無効化/解除するための公開メソッド
+    public void SetInputLocked(bool locked)
+    {
+        InputLocked = locked;
+        if (locked) ClearInputIntents();
     }
 
     // 攻撃系トリガーの予約をすべてクリアする（前の攻撃予約が残って誤発火するのを防ぐ）
@@ -702,12 +800,8 @@ public class Player : MonoBehaviour
     //   イベントが飛んできて、誤って自分自身にダメージが入っていた。
     void OnTriggerEnter(Collider collision)
     {
-<<<<<<< HEAD
         //当たった対象物の[tag]がEAttack (エネミーによる攻撃)だった場合のみ処理する
         if (!collision.gameObject.CompareTag("EAttack") || HP <= 0) return;
-        //if(!collision.player.PlayerName != this.PlayerName || HP <= 0)
-            if (isGuarding)
-=======
         //地面に当たっている場合は無視
         if (collision.gameObject.CompareTag("Ground")) return;
 
@@ -726,7 +820,6 @@ public class Player : MonoBehaviour
 
         //ここまで来たら「敵の攻撃用ヒットボックスが自分の体に当たった」＝正真正銘の被弾
         if (isGuarding)
->>>>>>> main
         {
             // 仁王立ち（ガード）中に被弾した場合の処理
             atk += enemyPlayer.atk;                  // ガード成功で自分の攻撃力に敵の攻撃力を上乗せする
@@ -751,22 +844,15 @@ public class Player : MonoBehaviour
             hitParticle.Play();
             Destroy(hitParticle.gameObject, 1.0f);
 
-<<<<<<< HEAD
             HP -= atk;
-=======
             HP -= enemyPlayer.atk;
->>>>>>> main
         }
 
         //UIにHPを減らすように指示
         GameMNG mng = GameObject.Find("ManagerObject").GetComponent<GameMNG>();
-<<<<<<< HEAD
-        mng.Player_ReduceHP(HP);
         atk = 10;   // 敵の攻撃力を初期値に戻す（一度使ったらリセット）
-=======
         mng.Player_ReduceHP(HP, PlayerName);
         enemyPlayer.atk = 10;   // 敵の攻撃力を初期値に戻す（一度使ったらリセット）
->>>>>>> main
 
         if (HP < 0) HP = 0;
     }
@@ -794,39 +880,19 @@ public class Player : MonoBehaviour
         HP -= n;
         if (HP < 0) HP = 0;
         GameMNG mng = GameObject.Find("ManagerObject").GetComponent<GameMNG>();
-        // ★元コードのまま維持。"Enemy_ReduceHP"という名前だが実際にはプレイヤー自身のHPを渡している。
-        //   GameMNG側の実装次第では意図通りかもしれないが、要確認。
-        mng.Enemy_ReduceHP(HP);
+        // PvPモードなのでプレイヤー自身のHP表示を更新する（Enemy_ReduceHPはCPU敵専用でe1参照がnullになるため使わない）
+        mng.Player_ReduceHP(HP, PlayerName);
         //現在のHPの表示
         Debug.Log(HP);
         Debug.Log(PlayerName);
     }
 
-<<<<<<< HEAD
-    //プレイヤーの攻撃が相手プレイヤーにヒットした場合の処理
-    void EnemyPlayer(Player player)
-    {
-        if (player != null)
-        {
-            // 相手のプレイヤー番号が、自分（このスクリプト）の番号と違う場合
-            if (player.PlayerName != this.PlayerName)
-            {
-                Debug.Log($"プレイヤー{this.PlayerName}の攻撃が、プレイヤー{player.PlayerName}にヒット！");
-
-                // 相手に10ダメージ与える
-                player.TakeDamage(10);
-            }
-        }
-    }
-
-    // 相手プレイヤーにダメージを与えるための公開メソッド
-    public void TakeDamage(int i) => HP -= i;
 }
-=======
+
     // ★削除：EnemyPlayer() / TakeDamage() は OnTriggerEnter と組み合わさって
     //   二重ダメージ・自傷ダメージの原因になっていたため撤去した。
     //   ダメージ適用は OnTriggerEnter 内の1箇所に一本化している。
     //   もし「攻撃側が能動的に相手へダメージを与える」設計に変更したい場合は、
     //   OnTriggerEnter側のダメージ処理をこちらに移し替える形で作り直すこと。
-}
->>>>>>> main
+
+

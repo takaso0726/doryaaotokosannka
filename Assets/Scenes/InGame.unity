@@ -638,9 +638,7 @@ CapsuleCollider:
   m_Height: 1
   m_Direction: 1
   m_Center: {x: 0, y: 0, z: 0}
-<<<<<<< HEAD
 --- !u!4 &287985241 stripped
-=======
 --- !u!1 &257409818
 GameObject:
   m_ObjectHideFlags: 0
@@ -694,13 +692,10 @@ Transform:
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!4 &261151049 stripped
->>>>>>> origin/Timer
 Transform:
   m_CorrespondingSourceObject: {fileID: 1852576806548013000, guid: 29dd0fc02d04a7447b40e484821a9f0d, type: 3}
   m_PrefabInstance: {fileID: 486434307}
   m_PrefabAsset: {fileID: 0}
-<<<<<<< HEAD
-=======
 --- !u!1 &279331876
 GameObject:
   m_ObjectHideFlags: 0
@@ -944,7 +939,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: df757e62e5dc1f144b58461149409e34, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ColliderVisualizer_Red
->>>>>>> origin/Timer
 --- !u!4 &288012719 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 2563496969622287784, guid: 29dd0fc02d04a7447b40e484821a9f0d, type: 3}
@@ -3854,9 +3848,7 @@ CapsuleCollider:
   m_Height: 1
   m_Direction: 1
   m_Center: {x: 0, y: 0, z: 0}
-<<<<<<< HEAD
-=======
---- !u!4 &1118089861 stripped
+llll--- !u!4 &1118089861 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 6000407479487422213, guid: 29dd0fc02d04a7447b40e484821a9f0d, type: 3}
   m_PrefabInstance: {fileID: 1762534572}
@@ -3942,7 +3934,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1122048056}
   m_CullTransparentMesh: 1
->>>>>>> origin/Timer
 --- !u!1 &1139952992
 GameObject:
   m_ObjectHideFlags: 0
@@ -6273,13 +6264,10 @@ AudioSource:
   m_audioClip: {fileID: 0}
   m_Resource: {fileID: 8300000, guid: 78215c0163ae6f14e9dbae9023719665, type: 3}
   m_PlayOnAwake: 1
-<<<<<<< HEAD
   m_Volume: 1
   m_Pitch: 1.9
-=======
   m_Volume: 0.7
   m_Pitch: 1.84
->>>>>>> origin/map
   Loop: 1
   Mute: 0
   Spatialize: 0
@@ -7210,8 +7198,5 @@ SceneRoots:
   - {fileID: 1697653417}
   - {fileID: 1669255702}
   - {fileID: 1747786506}
-<<<<<<< HEAD
   - {fileID: 257409820}
-=======
   - {fileID: 527021905}
->>>>>>> origin/map

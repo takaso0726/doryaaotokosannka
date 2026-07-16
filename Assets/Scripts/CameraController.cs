@@ -125,6 +125,22 @@ public class FightingCameraController : MonoBehaviour
     [Tooltip("咆哮するキャラクターのどのあたりを見るか（高さ）")]
     public float rebornRoarLookAtHeight = 1.6f;
 
+    [Header("投げ成立カットイン演出（コマンド投げ）")]
+    [Tooltip("演出中、攻撃側・被害側2人の中間点からカメラを離す距離")]
+    public float grabCutInDistance = 3.0f;
+
+    [Tooltip("演出中のカメラの高さ")]
+    public float grabCutInHeight = 1.6f;
+
+    [Tooltip("2人を結んだ軸から、どれだけ横に回り込んだ角度にするか（度）")]
+    public float grabCutInAngle = 25f;
+
+    [Tooltip("演出開始時、カメラが寄る速さ（小さいほど素早く寄る）")]
+    public float grabCutInMoveInSmoothTime = 0.15f;
+
+    [Tooltip("演出の継続時間。この時間が経過すると自動的に通常の追従モードへ戻る")]
+    public float grabCutInDuration = 1.0f;
+
     // 内部状態
     private Vector3 _velocityPos;   // SmoothDamp用
     private float _velocityZoom;    // SmoothDamp用（float）
@@ -155,6 +171,13 @@ public class FightingCameraController : MonoBehaviour
     private float _rebornOrbitTimer;
     private float _rebornOrbitStartAngle;
 
+    // 投げ成立カットイン演出関連
+    private bool _isGrabCutInMode = false;
+    private Transform _grabAttacker;
+    private Transform _grabVictim;
+    private float _grabCutInTimer;
+    private Vector3 _grabCutInVelocityPos;
+
     void Start()
     {
         _currentDistance = (maxZoomDistance + minZoomDistance) * 0.5f;
@@ -165,6 +188,13 @@ public class FightingCameraController : MonoBehaviour
     {
         // Volumeの重みは常にスムーズに追従させる（演出のON/OFFに関わらず処理）
         UpdateGuardImpactVolume();
+
+        // 投げが成立した瞬間のカットイン演出は、他の演出より最優先で処理する
+        if (_isGrabCutInMode)
+        {
+            UpdateGrabCutInCamera();
+            return;
+        }
 
         // 仁王立ちで攻撃を受け止めた直後は、最優先でローアングルの被弾カメラを処理する
         if (_isGuardImpactMode)
@@ -351,6 +381,77 @@ public class FightingCameraController : MonoBehaviour
         _isGuardImpactMode = false;
         _guardImpactTarget = null;
         _guardImpactComboCount = 0;
+    }
+
+    /// <summary>
+    /// コマンド投げが成立した瞬間、Playerスクリプトから呼び出す。
+    /// 攻撃側・被害側2人の中間点へグッと寄り、カットイン演出用のアングルを作る。
+    /// grabCutInDuration が経過すると自動的に通常の追従モードへ戻る。
+    /// </summary>
+    /// <param name="attacker">投げを成立させた側のTransform</param>
+    /// <param name="victim">投げられた側のTransform</param>
+    public void TriggerGrabCutIn(Transform attacker, Transform victim)
+    {
+        if (attacker == null || victim == null) return;
+
+        _isGrabCutInMode = true;
+        _grabAttacker = attacker;
+        _grabVictim = victim;
+        _grabCutInTimer = grabCutInDuration;
+    }
+
+    /// <summary>
+    /// 投げカットイン演出を強制的に終了し、通常の追従モードへ戻す
+    /// （演出をPlayer側の都合で早めに切り上げたい場合などに使用）
+    /// </summary>
+    public void ClearGrabCutIn()
+    {
+        _isGrabCutInMode = false;
+        _grabAttacker = null;
+        _grabVictim = null;
+    }
+
+    /// <summary>
+    /// 投げカットイン演出の毎フレーム更新処理
+    /// </summary>
+    private void UpdateGrabCutInCamera()
+    {
+        if (_grabAttacker == null || _grabVictim == null)
+        {
+            ClearGrabCutIn();
+            return;
+        }
+
+        _grabCutInTimer -= Time.deltaTime;
+        if (_grabCutInTimer <= 0f)
+        {
+            ClearGrabCutIn();
+            return;
+        }
+
+        // 1. 2人の中間点を注視点にする
+        Vector3 midPoint = (_grabAttacker.position + _grabVictim.position) * 0.5f;
+        Vector3 lookAtTarget = midPoint + Vector3.up * grabCutInHeight;
+
+        // 2. 攻撃側→被害側を結ぶ軸を基準に、横へ回り込んだ位置へカメラを置く
+        Vector3 baseDir = (_grabAttacker.position - _grabVictim.position);
+        baseDir.y = 0f;
+        if (baseDir.sqrMagnitude < 0.0001f) baseDir = Vector3.back;
+        Vector3 diagonalDir = Quaternion.AngleAxis(grabCutInAngle, Vector3.up) * baseDir.normalized;
+        Vector3 desiredCameraPos = midPoint + diagonalDir * grabCutInDistance;
+        desiredCameraPos.y = midPoint.y + grabCutInHeight;
+
+        // 3. グッと素早く寄るように移動
+        transform.position = Vector3.SmoothDamp(
+            transform.position,
+            desiredCameraPos,
+            ref _grabCutInVelocityPos,
+            grabCutInMoveInSmoothTime
+        );
+
+        // 4. 常に2人の中間点を見るように回転
+        transform.LookAt(lookAtTarget);
+        _smoothedLookAt = lookAtTarget;
     }
 
     /// <summary>

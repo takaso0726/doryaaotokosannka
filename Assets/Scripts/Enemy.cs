@@ -10,6 +10,7 @@ public class Enemy : MonoBehaviour
     public int HP;
     public Player player;
     bool Menflag;
+    bool flag = true;   // HP低下時のタックルを1回だけ発動させるためのフラグ
     public Animator animator;
     Rigidbody rb;                 //Rigidbody型の変数
     public Vector3 force;
@@ -28,6 +29,14 @@ public class Enemy : MonoBehaviour
     };
 
     public Enemy.Status Enemy_Status;
+
+    // 投げ成立時のカットイン演出など、外部からCPUの行動を止めたい時に使うフラグ
+    public bool InputLocked { get; private set; }
+
+    public void SetInputLocked(bool locked)
+    {
+        InputLocked = locked;
+    }
 
     CapsuleCollider Enemy_Collider;
 
@@ -195,6 +204,8 @@ public class Enemy : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
+        // 投げ成立後のカットイン演出中などは、CPUの行動判断・タイマー進行を止める
+        if (InputLocked) return;
 
         //タイマー加算
         ActionTimer += Time.deltaTime;
@@ -420,10 +431,7 @@ public class Enemy : MonoBehaviour
                     player.transform.Translate(0.0f, 0.0f, -0.0025f);
                     player.animator.SetTrigger("Thrown");
                     player.damege(Mathf.RoundToInt(5 * damageMultiplier));
-<<<<<<< HEAD
                     flag = false;
-=======
->>>>>>> main
                 }
                 break;
 
@@ -466,11 +474,8 @@ public class Enemy : MonoBehaviour
                 //プレイヤーのHPを減らす
                 HP -= player.atk;
             }
-<<<<<<< HEAD
                 player.atk = 10;
-=======
             player.atk = 10;
->>>>>>> main
 
             //一旦ボツ
             GameMNG mng = GameObject.Find("ManagerObject").GetComponent<GameMNG>();

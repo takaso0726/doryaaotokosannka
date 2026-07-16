@@ -39,12 +39,9 @@ public class GameMNG : MonoBehaviour
     //シーン中のカメラコントローラー
     public FightingCameraController cameraController;
 
-<<<<<<< HEAD
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
-=======
     //初期化
->>>>>>> main
     void Start()
     {
         
@@ -62,10 +59,7 @@ public class GameMNG : MonoBehaviour
 
 
         playerChangeTimer = 0.0f;
-<<<<<<< HEAD
-=======
         //プレイヤーのステータス
->>>>>>> main
         playerStatus = Player.Status.Live;
 
         //効果音再生用のAudioClipを取得
@@ -129,8 +123,6 @@ public class GameMNG : MonoBehaviour
     public void PlayerUI(float Timer,int Cnt)
     {
         //ド根性復活のタイマーとカウントを表示する
-        //Player_Timer_Text.text = PTimer.ToString();
-        //Player_Cnt_Text.text = PCnt.ToString();
     }
 
     //他のC#スクリプトから呼び出す変数
