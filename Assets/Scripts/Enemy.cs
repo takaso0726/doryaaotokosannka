@@ -136,8 +136,6 @@ public class Enemy : MonoBehaviour
     CapsuleCollider LeftLeg;
 
     float InitRotate;
-
-    bool flag;
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
@@ -191,7 +189,6 @@ public class Enemy : MonoBehaviour
 
         AtkHitboxOFF();
         InitRotate = transform.rotation.y;
-        flag = true;
 
     }
 
@@ -423,7 +420,10 @@ public class Enemy : MonoBehaviour
                     player.transform.Translate(0.0f, 0.0f, -0.0025f);
                     player.animator.SetTrigger("Thrown");
                     player.damege(Mathf.RoundToInt(5 * damageMultiplier));
+<<<<<<< HEAD
                     flag = false;
+=======
+>>>>>>> main
                 }
                 break;
 
@@ -466,7 +466,11 @@ public class Enemy : MonoBehaviour
                 //プレイヤーのHPを減らす
                 HP -= player.atk;
             }
+<<<<<<< HEAD
                 player.atk = 10;
+=======
+            player.atk = 10;
+>>>>>>> main
 
             //一旦ボツ
             GameMNG mng = GameObject.Find("ManagerObject").GetComponent<GameMNG>();
