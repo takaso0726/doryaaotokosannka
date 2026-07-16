@@ -465,8 +465,8 @@ public class Player : MonoBehaviour
         {
             //弱攻撃(パンチ)
             animator.SetTrigger("Punch");
-            LeftHand.enabled = true;
-            RightHand.enabled = true;
+            RightFoot.enabled = true;
+            RightLeg.enabled = true;
         }
         else
         {
@@ -490,6 +490,7 @@ public class Player : MonoBehaviour
             animator.SetTrigger("DownKick");
             RightFoot.enabled = true;
             RightLeg.enabled = true;
+            
         }
         else if (moveInput.y > upKickInputThreshold)
         {
@@ -504,9 +505,9 @@ public class Player : MonoBehaviour
             currentState = PlayerState.Kick;
             stateTimer = kickDuration;
             animator.SetTrigger("Kick");
-            LeftFoot.enabled = true;
-            LeftUpLeg.enabled = true;
-            LeftLeg.enabled = true;
+            RightFoot.enabled = true;
+            RightUpLeg.enabled = true;
+            RightLeg.enabled = true;
         }
     }
 
